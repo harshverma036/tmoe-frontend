@@ -5,8 +5,10 @@ import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader,
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { yupResolver } from '@hookform/resolvers/yup'
+import Link from 'next/link';
 import { useForm } from 'react-hook-form'
 import * as yup from 'yup';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 
 const signInSchema = yup.object().shape({
     email: yup.string().email('Invalid email').required('Email is required'),
@@ -46,7 +48,27 @@ const SignIn = () => {
                         Enter your email below to login to your account
                     </CardDescription>
                     <CardAction>
-                        <Button variant="link">Sign Up</Button>
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button variant="link">Sign Up</Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Choose account type</DialogTitle>
+                                    <DialogDescription>
+                                        Select how you want to sign up.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="flex flex-col gap-3 pt-2">
+                                    <Button asChild variant="outline" className="h-16 w-full text-base">
+                                        <Link href="/sign-up?type=BRAND">Brand</Link>
+                                    </Button>
+                                    <Button asChild variant="outline" className="h-16 w-full text-base">
+                                        <Link href="/sign-up?type=PUBLISHER">Publisher</Link>
+                                    </Button>
+                                </div>
+                            </DialogContent>
+                        </Dialog>
                     </CardAction>
                 </CardHeader>
                 <form onSubmit={handleSubmit(onSubmit)} className='space-y-6'>
