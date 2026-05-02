@@ -9,6 +9,13 @@ import Link from 'next/link';
 import { useForm } from 'react-hook-form'
 import * as yup from 'yup';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { useMutation } from '@tanstack/react-query';
+import apiConfig from '@/lib/apiConfig';
+import toast from 'react-hot-toast';
+import { AxiosError } from 'axios';
+import appConfig from '@/lib/appConfig';
+import Cookies from 'js-cookie';
+import { useRouter } from 'next/navigation';
 
 const signInSchema = yup.object().shape({
     email: yup.string().email('Invalid email').required('Email is required'),
@@ -21,6 +28,7 @@ const defaultValues = {
 }
 
 const SignIn = () => {
+    const router = useRouter(); 
     const {
         handleSubmit,
         register,
@@ -35,8 +43,28 @@ const SignIn = () => {
         mode: 'onTouched'
     })
 
-    const onSubmit = (data: typeof defaultValues) => {
-        console.log(data);
+    const { mutate: signIn, isPending } = useMutation({
+        mutationFn: async (payload: yup.InferType<typeof signInSchema>) => {
+            const response = await apiConfig.post('/api/auth/login', payload);
+            return response.data;
+        },
+        onSuccess: (responseData) => {
+            const userInfo = responseData?.userinfo;
+            const token = responseData?.token;
+
+            Cookies.set(appConfig.cookies.userInfoKey, JSON.stringify(userInfo), { sameSite: 'lax', path: '/' });
+            Cookies.set(appConfig.cookies.userTokenKey, token, { sameSite: 'lax', path: '/' });
+
+            toast.success('Logged in successfully');
+            router.push('/');
+        },
+        onError: (error: AxiosError<{ message?: string }>) => {
+            toast.error(error?.response?.data?.message || 'Failed to login');
+        }
+    })
+
+    const onSubmit = (data: yup.InferType<typeof signInSchema>) => {
+        signIn(data);
     }
 
     return (
@@ -101,8 +129,8 @@ const SignIn = () => {
 
                     </CardContent>
                     <CardFooter className="flex-col gap-2">
-                        <Button type="submit" className="w-full" disabled={!isValid}>
-                            Login
+                        <Button type="submit" className="w-full" disabled={!isValid || isPending}>
+                            {isPending ? 'Logging in...' : 'Login'}
                         </Button>
                     </CardFooter>
                 </form>

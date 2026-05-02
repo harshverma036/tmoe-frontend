@@ -17,6 +17,12 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useMutation } from "@tanstack/react-query";
+import apiConfig from "@/lib/apiConfig";
+import { useRouter, useSearchParams } from "next/navigation";
+import toast from "react-hot-toast";
+import { AxiosError } from "axios";
+
 
 const signUpSchema = yup
   .object({
@@ -24,6 +30,7 @@ const signUpSchema = yup
     email: yup.string().email("Invalid email").required("Email is required"),
     website_url: yup.string().optional(),
     password: yup.string().trim().required("Password is required"),
+    role: yup.string().oneOf(['BRAND', 'PUBLISHER']).optional()
   })
   .required();
 
@@ -32,9 +39,11 @@ const defaultValues = {
   email: "",
   website_url: "",
   password: "",
+  role: "PUBLISHER" as "BRAND" | "PUBLISHER" | undefined,
 };
 
 const SignUpForm = () => {
+  const router = useRouter();
   const {
     register,
     handleSubmit,
@@ -45,80 +54,102 @@ const SignUpForm = () => {
     mode: "onTouched",
   });
 
+  const searchParams = useSearchParams();
+  const role: "BRAND" | "PUBLISHER" | undefined = searchParams.get('type') as "BRAND" | "PUBLISHER" | undefined;
+
+  const { mutate: signUp, isPending } = useMutation({
+    mutationFn: async (data: yup.InferType<typeof signUpSchema>) => {
+      const response = await apiConfig.post('/api/auth/register', data);
+      return response.data;
+    },
+    onSuccess: (response, variables) => {
+      const email =
+        response?.data?.email ?? variables.email;
+      toast.success("Account created successfully");
+      router.push(
+        `/verify-email?email=${encodeURIComponent(email)}`,
+      );
+    },
+    onError: (error: AxiosError<{ message: string }>) => {
+      console.error(error?.response?.data?.message)
+      toast.error(error?.response?.data?.message ||'Failed to create account');
+    }
+  })
+
   const onSubmit = (data: yup.InferType<typeof signUpSchema>) => {
-    console.log(data);
+    signUp({ ...data, role: role });
   };
 
   return (
     <div className="flex h-screen items-center justify-center">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Create your account</CardTitle>
-          <CardDescription>
-            Fill in your details below to sign up for TMOE.
-          </CardDescription>
-          <CardAction>
-            <Button asChild variant="link">
-              <Link href="/sign-in">Sign In</Link>
-            </Button>
-          </CardAction>
-        </CardHeader>
+        <Card className="w-full max-w-sm">
+          <CardHeader>
+            <CardTitle>Create your account</CardTitle>
+            <CardDescription>
+              Fill in your details below to sign up for TMOE.
+            </CardDescription>
+            <CardAction>
+              <Button asChild variant="link">
+                <Link href="/sign-in">Sign In</Link>
+              </Button>
+            </CardAction>
+          </CardHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <CardContent>
-            <div className="flex flex-col gap-6">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  type="text"
-                  placeholder="John Doe"
-                  {...register("name")}
-                  errorMessage={errors?.name?.message}
-                />
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <CardContent>
+              <div className="flex flex-col gap-6">
+                <div className="grid gap-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="John Doe"
+                    {...register("name")}
+                    errorMessage={errors?.name?.message}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="example@tmoe.com"
+                    {...register("email")}
+                    errorMessage={errors?.email?.message}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="website_url">Website (Optional)</Label>
+                  <Input
+                    id="website_url"
+                    type="url"
+                    placeholder="https://your-site.com"
+                    {...register("website_url")}
+                    errorMessage={errors?.website_url?.message}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    {...register("password")}
+                    errorMessage={errors?.password?.message}
+                  />
+                </div>
               </div>
+            </CardContent>
 
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="example@tmoe.com"
-                  {...register("email")}
-                  errorMessage={errors?.email?.message}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="website_url">Website (Optional)</Label>
-                <Input
-                  id="website_url"
-                  type="url"
-                  placeholder="https://your-site.com"
-                  {...register("website_url")}
-                  errorMessage={errors?.website_url?.message}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  {...register("password")}
-                  errorMessage={errors?.password?.message}
-                />
-              </div>
-            </div>
-          </CardContent>
-
-          <CardFooter className="flex-col gap-2">
-            <Button type="submit" className="w-full" disabled={!isValid}>
-              Create Account
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
+            <CardFooter className="flex-col gap-2">
+              <Button type="submit" className="w-full" disabled={!isValid || isPending}>
+                {isPending ? 'Creating account...' : 'Create Account'}
+              </Button>
+            </CardFooter>
+          </form>
+        </Card>
     </div>
   );
 };
