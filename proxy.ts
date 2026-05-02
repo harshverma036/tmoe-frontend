@@ -46,6 +46,9 @@ export function proxy(request: NextRequest) {
   )
 
   if (!userInfoData) {
+    if (isAuthRoute) {
+      return NextResponse.next()
+    }
     return NextResponse.redirect(new URL("/sign-in", request.url))
   }
 
@@ -62,7 +65,7 @@ export function proxy(request: NextRequest) {
   }
 
   if (isBrandOrPublisher && !userInfoData.profile_completed) {
-    const completeProfilePath = `/complete-profile/${userInfoData.id}`
+    const completeProfilePath = `/complete-profile`
     if (pathname !== completeProfilePath) {
       return NextResponse.redirect(new URL(completeProfilePath, request.url))
     }
