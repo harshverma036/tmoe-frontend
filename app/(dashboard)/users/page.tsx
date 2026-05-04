@@ -2,6 +2,7 @@
 
 import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 import DataTable from "@/components/common/DataTable"
+import { useDataTableState } from "@/hooks/use-data-table-state"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,6 +30,10 @@ const emailLooksValid = (value: string) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
 
 const Users = () => {
+  // Table search / sort / page state — shared via `useDataTableState` for any `DataTable` screen.
+  const { query, setQuery, sorting, setSorting, pagination, setPagination } =
+    useDataTableState()
+
   const queryClient = useQueryClient()
   const [pendingApproveUser, setPendingApproveUser] =
     useState<PendingApproveUser | null>(null)
@@ -38,9 +43,15 @@ const Users = () => {
   const [inviteEmail, setInviteEmail] = useState("")
 
   const { isFetching, data: users } = useQuery({
-    queryKey: ["all_users"],
+    queryKey: ["all_users", query, sorting, pagination],
     queryFn: async () => {
-      const response = await apiConfig.get("/api/users/all")
+      const params = {
+        limit: pagination?.pageSize?.toString(),
+        skip: String(pagination?.pageIndex * pagination?.pageSize),
+        search: query,
+        search_field: 'email',
+      }
+      const response = await apiConfig.get("/api/users/all", { params });
 
       return response?.data?.data
     },
@@ -260,13 +271,13 @@ const Users = () => {
             Invite User
           </Button>
         }
-        // isCustomFilter
-        // customFilter={<div>filer</div>}
         data={users?.records ?? []}
-        pagination={{
-          pageIndex: 0,
-          pageSize: 10,
-        }}
+        query={query}
+        setQuery={setQuery}
+        sorting={sorting}
+        setSorting={setSorting}
+        pagination={pagination}
+        setPagination={setPagination}
         totalCount={users?.count ?? 0}
         count={users?.records?.length ?? 0}
         isFetching={isFetching && !users}
