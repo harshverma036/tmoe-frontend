@@ -4,6 +4,8 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 import DataTable from "@/components/common/DataTable"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import apiConfig from "@/lib/apiConfig"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AxiosError } from "axios"
@@ -23,12 +25,17 @@ type PendingDeleteUser = {
   email: string
 }
 
+const emailLooksValid = (value: string) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
+
 const Users = () => {
   const queryClient = useQueryClient()
   const [pendingApproveUser, setPendingApproveUser] =
     useState<PendingApproveUser | null>(null)
   const [pendingDeleteUser, setPendingDeleteUser] =
     useState<PendingDeleteUser | null>(null)
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState("")
 
   const { isFetching, data: users } = useQuery({
     queryKey: ["all_users"],
@@ -66,6 +73,28 @@ const Users = () => {
       toast.error(error.response?.data?.message ?? "Could not remove user")
     },
   })
+
+  const { mutate: sendAdminInvitation, isPending: isSendingInvite } =
+    useMutation({
+      mutationFn: async (email: string) => {
+        const response = await apiConfig.post(
+          "/api/users/send-admin-invitation",
+          { email },
+        )
+        return response.data
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["all_users"] })
+        toast.success("Invitation sent")
+        setInviteEmail("")
+        setInviteOpen(false)
+      },
+      onError: (error: AxiosError<{ message?: string }>) => {
+        toast.error(
+          error.response?.data?.message ?? "Could not send invitation",
+        )
+      },
+    })
 
   const columns = () => [
     {
@@ -189,10 +218,48 @@ const Users = () => {
         }}
       />
 
+      <ConfirmDialog
+        open={inviteOpen}
+        onOpenChange={(open) => {
+          if (!open && !isSendingInvite) {
+            setInviteOpen(false)
+            setInviteEmail("")
+          }
+        }}
+        title="Invite user"
+        description="Enter the email address to send an admin invitation."
+        confirmLabel="Send invitation"
+        pendingLabel="Sending…"
+        isPending={isSendingInvite}
+        confirmDisabled={!emailLooksValid(inviteEmail)}
+        onConfirm={() => {
+          if (emailLooksValid(inviteEmail)) {
+            sendAdminInvitation(inviteEmail.trim())
+          }
+        }}
+      >
+        <div className="grid gap-2 py-1">
+          <Label htmlFor="invite-user-email">Email</Label>
+          <Input
+            id="invite-user-email"
+            type="email"
+            autoComplete="email"
+            placeholder="name@example.com"
+            value={inviteEmail}
+            disabled={isSendingInvite}
+            onChange={(e) => setInviteEmail(e.target.value)}
+          />
+        </div>
+      </ConfirmDialog>
+
       <DataTable
         columns={columns()}
         title="Users"
-        actionButtons={<Button>Invite User</Button>}
+        actionButtons={
+          <Button type="button" onClick={() => setInviteOpen(true)}>
+            Invite User
+          </Button>
+        }
         // isCustomFilter
         // customFilter={<div>filer</div>}
         data={users?.records ?? []}
