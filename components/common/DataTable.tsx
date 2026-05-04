@@ -293,7 +293,14 @@ const DataTable = ({
                   colSpan={columns.length + (enableMultiSelect ? 1 : 0)}
                   className="h-24 text-center text-muted-foreground"
                 >
-                  No records found.
+                  {props?.isFetching ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Loading...</span>
+                    </div>
+                  ) : (
+                    "No records found."
+                  )}
                 </TableCell>
               </TableRow>
             )}

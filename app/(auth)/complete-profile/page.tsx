@@ -1,7 +1,13 @@
-import PublisherProfileForm from "./components/publisher-form"
+import { Suspense } from "react"
+
+import CompleteProfileWizard from "./components/complete-profile-wizard"
 
 const CompleteProfile = () => {
-  return <PublisherProfileForm />
+  return (
+    <Suspense fallback={null}>
+      <CompleteProfileWizard />
+    </Suspense>
+  )
 }
 
 export default CompleteProfile

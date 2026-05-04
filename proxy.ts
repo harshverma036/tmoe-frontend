@@ -66,10 +66,18 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(verifyUrl)
   }
 
-  if (isBrandOrPublisher && !userInfoData.profile_completed && userInfoData?.email_verified_at) {
-    const completeProfilePath = `/complete-profile`
-    if (pathname !== completeProfilePath) {
-      return NextResponse.redirect(new URL(completeProfilePath, request.url))
+  if (
+    isBrandOrPublisher &&
+    !userInfoData.profile_completed &&
+    userInfoData?.email_verified_at
+  ) {
+    const paramType = request.nextUrl.searchParams.get("type")?.toUpperCase()
+    const needsRedirect =
+      pathname !== "/complete-profile" || paramType !== role
+    if (needsRedirect) {
+      const url = new URL("/complete-profile", request.url)
+      url.searchParams.set("type", role)
+      return NextResponse.redirect(url)
     }
     return NextResponse.next()
   }

@@ -36,8 +36,6 @@ const VerifyEmailPage = () => {
     refetchInterval: 3000,
     retry: false,
   });
-  console.log("userData", userData);
-
   useEffect(() => {
     if (!userData?.email_verified_at || !userData?.id) {
       return;
@@ -47,7 +45,10 @@ const VerifyEmailPage = () => {
       sameSite: "lax",
       path: "/",
     });
-    router.push(`/complete-profile/${userData?.id}`);
+    const role = String(userData?.role ?? "PUBLISHER").toUpperCase();
+    const type =
+      role === "BRAND" || role === "PUBLISHER" ? role : "PUBLISHER";
+    router.push(`/complete-profile?type=${encodeURIComponent(type)}`);
   }, [router, userData]);
 
   return (
