@@ -1,18 +1,15 @@
 import React from "react"
+import Image from "next/image"
 import Link from "next/link"
-import { LayoutDashboard, Settings, Users } from "lucide-react"
 
+import { DashboardSidebarNav } from "@/components/layout/dashboard-sidebar-nav"
 import { Button } from "@/components/ui/button"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import {
     Sidebar,
-    SidebarContent,
     SidebarFooter,
     SidebarHeader,
     SidebarInset,
-    SidebarMenu,
-    SidebarMenuButton,
-    SidebarMenuItem,
     SidebarProvider,
     SidebarRail,
     SidebarTrigger,
@@ -20,12 +17,6 @@ import {
 import appConfig from "@/lib/appConfig"
 import { cookies } from 'next/headers';
 import _ from 'lodash'
-
-const navItems = [
-    { label: "Dashboard", href: "/insights", icon: LayoutDashboard },
-    { label: "Users", href: "/users", icon: Users },
-    { label: "Settings", href: "/settings", icon: Settings },
-]
 
 const layout = async ({
     children,
@@ -40,26 +31,25 @@ const layout = async ({
         <TooltipProvider>
             <SidebarProvider>
                 <Sidebar collapsible="icon" variant="inset">
-                    <SidebarHeader className="flex h-14 items-center border-b px-4 py-0">
-                        <h2 className="text-lg font-semibold tracking-wide">TMOE</h2>
+                    <SidebarHeader className="flex min-h-16 items-center justify-center border-b px-4 py-4">
+                        <Link
+                            href="/insights"
+                            className="flex w-full items-center justify-center overflow-hidden rounded-md outline-none ring-sidebar-ring focus-visible:ring-2"
+                        >
+                            <Image
+                                src="/tmoe.svg"
+                                alt="TMOE"
+                                width={226}
+                                height={131}
+                                priority
+                                className="h-11 w-auto max-w-[min(100%,10rem)] object-contain object-center group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:max-w-9"
+                            />
+                        </Link>
                     </SidebarHeader>
 
-                    <SidebarContent className="p-2">
-                        <SidebarMenu>
-                            {navItems.map((item) => (
-                                <SidebarMenuItem key={item.label}>
-                                    <SidebarMenuButton asChild tooltip={item.label}>
-                                        <Link href={item.href}>
-                                            <item.icon />
-                                            <span>{item.label}</span>
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-                            ))}
-                        </SidebarMenu>
-                    </SidebarContent>
+                    <DashboardSidebarNav />
 
-                    <SidebarFooter className="border-t p-3">
+                    <SidebarFooter className="border-t p-4">
                         <div className="space-y-1">
                             <p className="text-sm font-medium">{_.capitalize(user?.name as string)}</p>
                             <p className="text-xs text-muted-foreground">{user?.email as string}</p>
