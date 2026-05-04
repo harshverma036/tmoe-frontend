@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Settings, Users, type LucideIcon } from "lucide-react"
 
 import {
   SidebarContent,
@@ -10,19 +9,11 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import {
+  dashboardNavItems,
+  dashboardNavMatchesPath,
+} from "@/lib/dashboard-nav"
 import { cn } from "@/lib/utils"
-
-const navItems: { label: string; href: string; icon: LucideIcon }[] = [
-  { label: "Dashboard", href: "/insights", icon: LayoutDashboard },
-  { label: "Users", href: "/users", icon: Users },
-  { label: "Settings", href: "/settings", icon: Settings },
-]
-
-function navMatchesPath(pathname: string, href: string) {
-  if (pathname === href) return true
-  if (href !== "/" && pathname.startsWith(`${href}/`)) return true
-  return false
-}
 
 export function DashboardSidebarNav() {
   const pathname = usePathname()
@@ -30,9 +21,9 @@ export function DashboardSidebarNav() {
   return (
     <SidebarContent className="gap-0 px-3 py-5">
       <SidebarMenu className="gap-2">
-        {navItems.map((item) => {
+        {dashboardNavItems.map((item) => {
           const Icon = item.icon
-          const active = navMatchesPath(pathname, item.href)
+          const active = dashboardNavMatchesPath(pathname, item.href)
           return (
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
