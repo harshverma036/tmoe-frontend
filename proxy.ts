@@ -79,7 +79,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
-  if (isAuthRoute) {
+  if (isAuthRoute || pathname === "/") {
     return NextResponse.redirect(new URL("/insights", request.url))
   }
 

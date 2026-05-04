@@ -56,7 +56,7 @@ const SignIn = () => {
             Cookies.set(appConfig.cookies.userTokenKey, token, { sameSite: 'lax', path: '/' });
 
             toast.success('Logged in successfully');
-            router.push('/');
+            router.push('/insights');
         },
         onError: (error: AxiosError<{ message?: string }>) => {
             toast.error(error?.response?.data?.message || 'Failed to login');
