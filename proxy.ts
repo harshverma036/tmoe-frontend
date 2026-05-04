@@ -55,16 +55,18 @@ export function proxy(request: NextRequest) {
   const role = (userInfoData.role ?? "").toUpperCase()
   const isBrandOrPublisher = role === "BRAND" || role === "PUBLISHER"
 
-  if (
-    isBrandOrPublisher &&
-    !userInfoData.email_verified_at
-  ) {
+  // console.log("user role", role);
+
+  if (isBrandOrPublisher && !userInfoData.email_verified_at) {
+    if (pathname === "/verify-email") {
+      return NextResponse.next()
+    }
     const verifyUrl = new URL("/verify-email", request.url)
     verifyUrl.searchParams.set("email", userInfoData.email)
     return NextResponse.redirect(verifyUrl)
   }
 
-  if (isBrandOrPublisher && !userInfoData.profile_completed) {
+  if (isBrandOrPublisher && !userInfoData.profile_completed && userInfoData?.email_verified_at) {
     const completeProfilePath = `/complete-profile`
     if (pathname !== completeProfilePath) {
       return NextResponse.redirect(new URL(completeProfilePath, request.url))

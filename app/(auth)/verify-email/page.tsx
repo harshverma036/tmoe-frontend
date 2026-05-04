@@ -33,17 +33,10 @@ const VerifyEmailPage = () => {
 
       return response?.data?.data;
     },
-    refetchInterval: (query) => {
-      const currentUserData = query.state.data as
-        | { email_verified_at?: string | null; id?: string }
-        | undefined;
-      if (currentUserData?.email_verified_at) {
-        return false;
-      }
-      return 3000;
-    },
+    refetchInterval: 3000,
     retry: false,
   });
+  console.log("userData", userData);
 
   useEffect(() => {
     if (!userData?.email_verified_at || !userData?.id) {
