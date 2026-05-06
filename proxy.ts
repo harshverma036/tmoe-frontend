@@ -7,6 +7,7 @@ const AUTH_ROUTE_SEGMENTS = [
   "complete-profile",
   "verify-email",
   "waiting-approval",
+  "email-verified",
 ] as const
 
 function firstPathSegment(pathname: string): string {
@@ -58,7 +59,7 @@ export function proxy(request: NextRequest) {
   // console.log("user role", role);
 
   if (isBrandOrPublisher && !userInfoData.email_verified_at) {
-    if (pathname === "/verify-email") {
+    if (pathname === "/verify-email" || pathname === "/email-verified") {
       return NextResponse.next()
     }
     const verifyUrl = new URL("/verify-email", request.url)
