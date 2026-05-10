@@ -58,7 +58,7 @@ export async function updateContentSlot(
   id: string,
   payload: ContentSlotFormValues,
 ): Promise<unknown> {
-  const { data } = await apiConfig.patch(
+  const { data } = await apiConfig.put(
     `/api/publisher/content-slot/${id}`,
     payload,
   )
