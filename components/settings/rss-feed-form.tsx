@@ -1,12 +1,17 @@
 "use client"
 
 import { yupResolver } from "@hookform/resolvers/yup"
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { AxiosError } from "axios"
 import { useForm, type Resolver } from "react-hook-form"
 import toast from "react-hot-toast"
 
-import { updateRssFeed } from "@/lib/api/user-settings"
+import {
+  buildRssSectionPayload,
+  publisherProfileMeQueryKey,
+  updatePublisherProfile,
+  type UpdatePublisherProfilePayload,
+} from "@/lib/api/publisher-profile"
 import { rssFeedSchema, type RssFeedValues } from "@/lib/validation/settings-forms"
 
 import { Button } from "@/components/ui/button"
@@ -24,6 +29,7 @@ type RssFeedFormProps = {
 }
 
 export function RssFeedForm({ initialValues }: RssFeedFormProps) {
+
   const {
     register,
     handleSubmit,
@@ -36,10 +42,15 @@ export function RssFeedForm({ initialValues }: RssFeedFormProps) {
   })
 
   const { mutate, isPending } = useMutation({
-    mutationFn: updateRssFeed,
-    onSuccess: (_, variables) => {
+    mutationFn: ({
+      payload,
+    }: {
+      payload: UpdatePublisherProfilePayload
+      formValues: RssFeedValues
+    }) => updatePublisherProfile(payload),
+    onSuccess: async (_, { formValues }) => {
       toast.success("RSS feed URL updated")
-      reset(variables)
+      reset(formValues)
     },
     onError: (error: AxiosError<{ message?: string }>) => {
       toast.error(error.response?.data?.message ?? "Could not update RSS feed URL")
@@ -48,7 +59,17 @@ export function RssFeedForm({ initialValues }: RssFeedFormProps) {
 
   return (
     <SettingsCard id="settings-rss" title="RSS feed">
-      <form onSubmit={handleSubmit((data) => mutate(data))} className="space-y-6">
+      <form
+        onSubmit={handleSubmit((data) => {
+          const payload = buildRssSectionPayload(data)
+          if (Object.keys(payload).length === 0) {
+            toast.error("Enter a valid RSS feed URL")
+            return
+          }
+          mutate({ payload, formValues: data })
+        })}
+        className="space-y-6"
+      >
         <div className="grid gap-2 w-full">
           <Label htmlFor="rss-feed-url">RSS feed URL</Label>
           <Input

@@ -1,12 +1,17 @@
 "use client"
 
 import { yupResolver } from "@hookform/resolvers/yup"
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { AxiosError } from "axios"
 import { useForm } from "react-hook-form"
 import toast from "react-hot-toast"
 
-import { updateBankDetails } from "@/lib/api/user-settings"
+import {
+  buildBankSectionPayload,
+  publisherProfileMeQueryKey,
+  updatePublisherProfile,
+  type UpdatePublisherProfilePayload,
+} from "@/lib/api/publisher-profile"
 import {
   bankDetailsSchema,
   type BankDetailsValues,
@@ -30,6 +35,7 @@ type BankDetailsFormProps = {
 }
 
 export function BankDetailsForm({ initialValues }: BankDetailsFormProps) {
+
   const {
     register,
     handleSubmit,
@@ -42,10 +48,15 @@ export function BankDetailsForm({ initialValues }: BankDetailsFormProps) {
   })
 
   const { mutate, isPending } = useMutation({
-    mutationFn: updateBankDetails,
-    onSuccess: (_, variables) => {
+    mutationFn: ({
+      payload,
+    }: {
+      payload: UpdatePublisherProfilePayload
+      formValues: BankDetailsValues
+    }) => updatePublisherProfile(payload),
+    onSuccess: async (_, { formValues }) => {
       toast.success("Bank details updated")
-      reset(variables)
+      reset(formValues)
     },
     onError: (error: AxiosError<{ message?: string }>) => {
       toast.error(error.response?.data?.message ?? "Could not update bank details")
@@ -55,7 +66,9 @@ export function BankDetailsForm({ initialValues }: BankDetailsFormProps) {
   return (
     <SettingsCard id="settings-bank" title="Bank details">
       <form
-        onSubmit={handleSubmit((data) => mutate(data))}
+        onSubmit={handleSubmit((data) =>
+          mutate({ payload: buildBankSectionPayload(data), formValues: data })
+        )}
         className="space-y-6"
       >
         <div className="grid gap-4 sm:grid-cols-2">

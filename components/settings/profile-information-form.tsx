@@ -1,7 +1,7 @@
 "use client"
 
 import { yupResolver } from "@hookform/resolvers/yup"
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { AxiosError } from "axios"
 import {
   useForm,
@@ -15,7 +15,12 @@ import {
   PUBLISHER_CONTENT_CATEGORIES,
   PUBLISHER_REGIONS,
 } from "@/lib/constants/publisher-profile-options"
-import { updateProfileInformation } from "@/lib/api/user-settings"
+import {
+  buildProfileSectionPayload,
+  publisherProfileMeQueryKey,
+  updatePublisherProfile,
+  type UpdatePublisherProfilePayload,
+} from "@/lib/api/publisher-profile"
 import {
   profileInformationSchema,
   type ProfileInformationFormValues,
@@ -46,6 +51,7 @@ type ProfileInformationFormProps = {
 export function ProfileInformationForm({
   initialValues,
 }: ProfileInformationFormProps) {
+
   const {
     register,
     control,
@@ -78,10 +84,16 @@ export function ProfileInformationForm({
   }
 
   const { mutate, isPending } = useMutation({
-    mutationFn: updateProfileInformation,
-    onSuccess: (_, variables) => {
+    mutationFn: ({
+      payload,
+    }: {
+      payload: UpdatePublisherProfilePayload
+      formValues: ProfileInformationFormValues
+    }) => updatePublisherProfile(payload),
+    onSuccess: async (_, { formValues }) => {
+      // await queryClient.invalidateQueries({ queryKey: publisherProfileMeQueryKey })
       toast.success("Profile information updated")
-      reset(variables)
+      reset(formValues)
     },
     onError: (error: AxiosError<{ message?: string }>) => {
       toast.error(
@@ -91,7 +103,7 @@ export function ProfileInformationForm({
   })
 
   const onSubmit: SubmitHandler<ProfileInformationFormValues> = (data) => {
-    mutate(data)
+    mutate({ payload: buildProfileSectionPayload(data), formValues: data })
   }
 
   return (
