@@ -64,3 +64,8 @@ export async function updateContentSlot(
   )
   return data
 }
+
+export async function deleteContentSlot(id: string): Promise<unknown> {
+  const { data } = await apiConfig.delete(`/api/publisher/content-slot/${id}`)
+  return data
+}

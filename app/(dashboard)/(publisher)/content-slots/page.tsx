@@ -1,12 +1,15 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { AxiosError } from "axios"
 import { Search } from "lucide-react"
 import toast from "react-hot-toast"
 
+import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 import {
     contentSlotsQueryKey,
+    deleteContentSlot,
     fetchContentSlots,
 } from "@/lib/api/content-slots"
 import type { ContentSlot } from "@/lib/validation/content-slot-form"
@@ -25,7 +28,6 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
-    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
@@ -44,6 +46,7 @@ function matchesSearch(slot: ContentSlot, query: string): boolean {
 }
 
 export default function ContentSlotsPage() {
+    const queryClient = useQueryClient()
     const {
         data: slots = [],
         isFetching,
@@ -52,6 +55,20 @@ export default function ContentSlotsPage() {
     } = useQuery({
         queryKey: contentSlotsQueryKey,
         queryFn: fetchContentSlots,
+    })
+
+    const deleteSlot = useMutation({
+        mutationFn: deleteContentSlot,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: contentSlotsQueryKey })
+            toast.success("Slot deleted")
+            setDeleteTarget(null)
+        },
+        onError: (error: AxiosError<{ message?: string }>) => {
+            toast.error(
+                error.response?.data?.message ?? "Could not delete content slot",
+            )
+        },
     })
 
     const [search, setSearch] = useState("")
@@ -94,12 +111,6 @@ export default function ContentSlotsPage() {
         setEditorMode("edit")
         setEditingId(slot.id)
         setEditorOpen(true)
-    }
-
-    function confirmDelete() {
-        if (!deleteTarget) return
-        toast.success("Slot deleted")
-        setDeleteTarget(null)
     }
 
     return (
@@ -203,38 +214,29 @@ export default function ContentSlotsPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Delete confirmation */}
-            <Dialog
+            <ConfirmDialog
                 open={deleteTarget !== null}
                 onOpenChange={(open) => {
+                    if (!open && deleteSlot.isPending) return
                     if (!open) setDeleteTarget(null)
                 }}
-            >
-                <DialogContent className="sm:max-w-md" showCloseButton>
-                    <DialogHeader>
-                        <DialogTitle>Delete slot?</DialogTitle>
-                        <DialogDescription>
-                            This removes{" "}
-                            <span className="font-medium text-foreground">
-                                {deleteTarget?.id}
-                            </span>{" "}
-                            from the list. This action cannot be undone.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setDeleteTarget(null)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="button" variant="destructive" onClick={confirmDelete}>
-                            Delete
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                title="Delete slot?"
+                description={
+                    deleteTarget ? (
+                        <>
+                            This slot will be deleted from the list. This action cannot be undone.
+                        </>
+                    ) : null
+                }
+                confirmLabel="Delete"
+                pendingLabel="Deleting…"
+                confirmVariant="destructive"
+                isPending={deleteSlot.isPending}
+                onConfirm={() => {
+                    if (!deleteTarget) return
+                    deleteSlot.mutate(deleteTarget.id)
+                }}
+            />
         </div>
     )
 }
