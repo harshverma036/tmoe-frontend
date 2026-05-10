@@ -1,7 +1,7 @@
 "use client"
 
 import { yupResolver } from "@hookform/resolvers/yup"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { AxiosError } from "axios"
 import {
   useForm,
@@ -17,7 +17,6 @@ import {
 } from "@/lib/constants/publisher-profile-options"
 import {
   buildProfileSectionPayload,
-  publisherProfileMeQueryKey,
   updatePublisherProfile,
   type UpdatePublisherProfilePayload,
 } from "@/lib/api/publisher-profile"

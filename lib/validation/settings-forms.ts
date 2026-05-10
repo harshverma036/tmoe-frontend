@@ -102,6 +102,67 @@ export type PersonalInformationValues = yup.InferType<
   typeof personalInformationSchema
 >
 
+const commerceLinkRowSchema = yup.object({
+  url: yup
+    .string()
+    .transform((v) =>
+      typeof v === "string" && v.trim() === "" ? undefined : v
+    )
+    .optional()
+    .url("Enter a valid URL"),
+})
+
+/** Brand profile section — optional fields align with backend `@IsOptional()` DTO. */
+export const brandProfileInformationSchema = yup.object({
+  brand_name: yup
+    .string()
+    .transform((v) => (typeof v === "string" ? emptyToUndefined(v) : v) as string | undefined)
+    .optional()
+    .test(
+      "non-empty-when-set",
+      "Brand name cannot be empty",
+      (v) => v == null || v.trim().length > 0,
+    ),
+  description: yup
+    .string()
+    .transform((v) => (typeof v === "string" ? emptyToUndefined(v) : v) as string | undefined)
+    .optional(),
+  industry: yup
+    .string()
+    .transform((v) => (typeof v === "string" ? emptyToUndefined(v) : v) as string | undefined)
+    .optional(),
+  headquarters_location: yup
+    .string()
+    .transform((v) => (typeof v === "string" ? emptyToUndefined(v) : v) as string | undefined)
+    .optional(),
+  product_categories: yup
+    .array()
+    .of(yup.string().trim().min(1, "Each category must be non-empty"))
+    .optional()
+    .default([]),
+  target_market_geo: yup
+    .array()
+    .of(yup.string().trim().min(1, "Each region must be non-empty"))
+    .optional()
+    .default([]),
+  commerce_links: yup
+    .array()
+    .of(commerceLinkRowSchema)
+    .optional()
+    .default([]),
+})
+
+/** Explicit shape for RHF + brand PATCH (commerce rows mirror onboarding). */
+export type BrandProfileInformationFormValues = {
+  brand_name?: string
+  description?: string
+  industry?: string
+  headquarters_location?: string
+  product_categories: string[]
+  target_market_geo: string[]
+  commerce_links: { url: string }[]
+}
+
 /** Explicit shape for RHF + PATCH payload (yup infer is overly strict on optional keys). */
 export type ProfileInformationFormValues = {
   website_url?: string

@@ -13,6 +13,10 @@ import {
   completeBrandProfile,
   mapBrandFormToApiPayload,
 } from "@/lib/api/brand-profile"
+import {
+  BRAND_PRODUCT_CATEGORY_OPTIONS,
+  BRAND_TARGET_MARKET_OPTIONS,
+} from "@/lib/constants/brand-profile-options"
 import type { BrandFormValues } from "@/lib/types/brand-profile"
 import { mergeUserInfoCookie } from "@/lib/update-cookie"
 
@@ -27,31 +31,6 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-
-const targetRegions = [
-  "India",
-  "APAC",
-  "North America",
-  "Europe",
-  "Middle East",
-  "Latin America",
-  "Africa",
-]
-
-const productCategories = [
-  "Beauty",
-  "Fashion",
-  "Food & Beverage",
-  "Health & Wellness",
-  "Home & Living",
-  "Electronics",
-  "Sports & Outdoors",
-  "Baby & Kids",
-  "Pet care",
-  "Travel",
-  "Education",
-  "Entertainment",
-]
 
 const commerceLinkRowSchema = yup.object({
   url: yup.string().trim().url("Enter a valid URL").required("URL is required"),
@@ -251,7 +230,7 @@ const BrandProfileForm = () => {
               <div className="grid gap-2">
                 <Label>Product categories</Label>
                 <div className="flex flex-wrap gap-2">
-                  {productCategories.map((category) => {
+                  {BRAND_PRODUCT_CATEGORY_OPTIONS.map((category) => {
                     const selected = selectedCategories?.includes(category)
                     return (
                       <Button
@@ -279,7 +258,7 @@ const BrandProfileForm = () => {
               <div className="grid gap-2">
                 <Label>Target markets</Label>
                 <div className="flex flex-wrap gap-2">
-                  {targetRegions.map((region) => {
+                  {BRAND_TARGET_MARKET_OPTIONS.map((region) => {
                     const selected = selectedMarkets?.includes(region)
                     return (
                       <Button
