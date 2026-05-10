@@ -26,7 +26,7 @@ export default function RootLayout({
     >
       <body>
         <QueryProvider>
-          <ThemeProvider defaultTheme="light" enableSystem={false}>
+          <ThemeProvider defaultTheme="dark" >
             {children}
           </ThemeProvider>
           <Toaster

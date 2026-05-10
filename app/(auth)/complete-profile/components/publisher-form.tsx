@@ -19,6 +19,10 @@ import {
   completePublisherProfile,
   mapPublisherFormToApiPayload,
 } from "@/lib/api/publisher-profile"
+import {
+  PUBLISHER_CONTENT_CATEGORIES,
+  PUBLISHER_REGIONS,
+} from "@/lib/constants/publisher-profile-options"
 import type {
   PublisherFormValues,
   PublisherInventoryItem,
@@ -44,17 +48,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-const regions = ["India", "APAC", "North America", "Europe", "Middle East"]
-const contentCategories = [
-  "Tech",
-  "Lifestyle",
-  "Finance",
-  "Health",
-  "Beauty",
-  "Travel",
-  "Education",
-  "Entertainment",
-]
+const regions = PUBLISHER_REGIONS
+const contentCategories = PUBLISHER_CONTENT_CATEGORIES
 const inventoryTypes = ["Article", "Video", "Newsletter", "Banner", "Native Ad"]
 const monetisationModels = ["CPM", "CPC", "CPA", "Fixed", "Affiliate"]
 
