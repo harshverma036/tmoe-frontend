@@ -4,7 +4,6 @@ import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import Cookies from "js-cookie"
-import { useTheme } from "next-themes"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -12,12 +11,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import appConfig from "@/lib/appConfig"
@@ -63,12 +57,6 @@ type DashboardUserMenuProps = {
 
 export function DashboardUserMenu({ user }: DashboardUserMenuProps) {
   const router = useRouter()
-  const { theme, setTheme, resolvedTheme } = useTheme()
-  const [mounted, setMounted] = React.useState(false)
-
-  React.useEffect(() => {
-    setMounted(true)
-  }, [])
 
   const displayName = user?.name?.trim()
     ? formatDisplayName(String(user.name))
@@ -87,15 +75,6 @@ export function DashboardUserMenu({ user }: DashboardUserMenuProps) {
     }
     router.replace("/sign-in")
   }
-
-  /** Sub-trigger label: reflect current mode once the client has mounted. */
-  const themeSummary = !mounted
-    ? "…"
-    : theme === "system"
-      ? "System"
-      : resolvedTheme === "dark"
-        ? "Dark"
-        : "Light"
 
   return (
     <DropdownMenu>

@@ -42,8 +42,9 @@ export function DashboardSidebarNav({
                   /* Active: soft primary wash, no outline — reads as one piece with the sidebar. */
                   "data-active:border-transparent data-active:bg-primary/16 data-active:font-semibold data-active:text-primary data-active:shadow-none",
                   "data-active:[&_svg]:text-primary",
-                  "dark:data-active:border-transparent dark:data-active:bg-primary/24 dark:data-active:text-primary",
-                  "dark:data-active:[&_svg]:text-primary"
+                  /* Dark: --primary is too dark on tinted bg; use sidebar accent pair for contrast. */
+                  "dark:data-active:border-transparent dark:data-active:bg-sidebar-accent dark:data-active:font-semibold dark:data-active:text-sidebar-accent-foreground dark:data-active:shadow-none",
+                  "dark:data-active:[&_svg]:text-sidebar-accent-foreground"
                 )}
               >
                 <Link href={item.href}>

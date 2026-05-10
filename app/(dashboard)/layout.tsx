@@ -5,6 +5,7 @@ import Link from "next/link"
 import { DashboardHeaderTitle } from "@/components/layout/dashboard-header-title"
 import { DashboardSidebarNav } from "@/components/layout/dashboard-sidebar-nav"
 import { DashboardUserMenu } from "@/components/layout/dashboard-user-menu"
+import { ThemeToggle } from "@/components/layout/theme-toggle"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import {
     Sidebar,
@@ -55,7 +56,8 @@ const layout = async ({
                     <header className="bg-background/95 sticky top-0 z-20 flex h-14 items-center gap-3 border-b px-4 backdrop-blur">
                         <SidebarTrigger />
                         <DashboardHeaderTitle userRole={user?.role} />
-                        <div className="ml-auto flex items-center">
+                        <div className="ml-auto flex items-center gap-1">
+                            <ThemeToggle />
                             <DashboardUserMenu user={user} />
                         </div>
                     </header>
