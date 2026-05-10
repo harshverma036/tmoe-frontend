@@ -1,8 +1,16 @@
 "use client"
 
 import { yupResolver } from "@hookform/resolvers/yup"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { AxiosError } from "axios"
 import { useForm, Controller, type Resolver } from "react-hook-form"
+import toast from "react-hot-toast"
 
+import {
+  createContentSlot,
+  contentSlotsQueryKey,
+  updateContentSlot,
+} from "@/lib/api/content-slots"
 import {
   CONTENT_SLOT_TYPES,
   MONETISATION_MODELS,
@@ -34,24 +42,54 @@ const emptyValues: ContentSlotFormValues = {
 type ContentSlotFormProps = {
   /** Distinguishes submit copy and default reset behaviour */
   mode: "create" | "edit"
+  /** Set when `mode` is `edit` (server id for update API). */
+  slotId?: string | null
   /** Initial field values (create uses empty defaults; edit passes slot fields) */
   defaultValues?: Partial<ContentSlotFormValues>
-  /** Called with validated payload */
-  onSubmit: (data: ContentSlotFormValues) => void
+  /** Called after a successful create or update (e.g. close dialog). */
+  onSuccess: () => void
   /** Close dialog without saving */
   onCancel: () => void
 }
 
 /**
  * Shared add/update form built exclusively from shadcn Input, Select, Label, Button.
- * Validation via react-hook-form + yup to match the rest of the app.
+ * Validation via react-hook-form + yup; persistence via react-query mutations.
  */
 export function ContentSlotForm({
   mode,
+  slotId,
   defaultValues,
-  onSubmit,
+  onSuccess,
   onCancel,
 }: ContentSlotFormProps) {
+  const queryClient = useQueryClient()
+
+  const saveSlot = useMutation({
+    mutationFn: (data: ContentSlotFormValues) => {
+      if (mode === "create") {
+        return createContentSlot(data)
+      }
+      if (!slotId) {
+        return Promise.reject(new Error("Missing slot id"))
+      }
+      return updateContentSlot(slotId, data)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: contentSlotsQueryKey })
+      toast.success(mode === "create" ? "Slot added" : "Slot updated")
+      onSuccess()
+    },
+    onError: (error: AxiosError<{ message?: string }>) => {
+      toast.error(
+        error.response?.data?.message ??
+        (mode === "create"
+          ? "Could not add content slot"
+          : "Could not update content slot"),
+      )
+    },
+  })
+
   const {
     register,
     handleSubmit,
@@ -65,8 +103,14 @@ export function ContentSlotForm({
     mode: "onTouched",
   })
 
+  async function onValidSubmit(data: ContentSlotFormValues) {
+    await saveSlot.mutateAsync(data)
+  }
+
+  const pendingAdd = isSubmitting || saveSlot.isPending
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
+    <form onSubmit={handleSubmit(onValidSubmit)} className="grid gap-4">
       <div className="grid gap-2">
         <Label htmlFor="slot-type">Type</Label>
         <Controller
@@ -159,11 +203,11 @@ export function ContentSlotForm({
       </div>
 
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={pendingAdd}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isSubmitting}>
-          {mode === "create" ? "Add slot" : "Save changes"}
+        <Button type="submit" disabled={pendingAdd}>
+          {!pendingAdd ? (mode === "create" ? "Add slot" : "Save changes") : "Submitting..."}
         </Button>
       </DialogFooter>
     </form>
