@@ -1,87 +1,92 @@
-import apiConfig from "@/lib/apiConfig";
+import apiConfig from "@/lib/apiConfig"
 
-import type { PublisherFormValues } from "@/lib/types/publisher-profile";
+import type {
+  BankDetailsValues,
+  PersonalInformationValues,
+  ProfileInformationFormValues,
+  RssFeedValues,
+} from "@/lib/validation/settings-forms"
 
-/**
- * Payload shape for POST /api/users/complete-profile/publisher
- * (aligned with the backend contract).
- */
-export type CompletePublisherProfileRequest = {
-    website_url?: string;
-    publication_name: string;
-    description: string;
-    regions_covered: string[];
-    content_categories: string[];
-    monthly_sessions: number;
-    page_views: number;
-    content_inventory: {
-        type: string;
-        category: string;
-        estimated_traffic: number;
-        monetisation_model?: string;
-    }[];
-    bank_name: string;
-    ifsc_code: string;
-    account_no: string;
-    holder_name: string;
-};
+export const publisherProfileMeQueryKey = ["publisher-profile", "me"] as const
 
-/** Relative path under `apiHost` for completing publisher onboarding. */
-export const COMPLETE_PUBLISHER_PROFILE_PATH =
-    "/api/users/complete-profile/publisher";
+// export type PublisherBankDetailRow = {
+//   id: string
+//   publisher_profile_id: string
+//   bank_name: string
+//   ifsc_code: string
+//   account_no: string
+//   holder_name: string
+//   createdAt: string
+//   updatedAt: string
+// }
 
-/**
- * Maps validated react-hook-form values to the JSON body the API expects.
- * Omits optional fields when they are empty so the payload stays minimal.
- */
-export function mapPublisherFormToApiPayload(
-    values: PublisherFormValues,
-): CompletePublisherProfileRequest {
-    const content_inventory = values.content_inventory.map((row) => {
-        const item: CompletePublisherProfileRequest["content_inventory"][number] = {
-            type: row.type,
-            category: row.category.trim(),
-            estimated_traffic: row.estimated_traffic as number,
-        };
-        const model = row.monetisation_model?.trim();
-        if (model) {
-            item.monetisation_model = model;
-        }
-        return item;
-    });
+// export type PublisherProfileMe = {
+//   id: string
+//   user_id: string
+//   website_url: string | null
+//   publication_name: string | null
+//   description: string | null
+//   regions_covered: string[]
+//   content_categories: string[]
+//   monthly_sessions: number | null
+//   page_views: number | null
+//   rss_feed_url: string | null
+//   updatedAt: string
+//   publisherBandDetails: PublisherBankDetailRow[]
+//   user: {
+//     name: string
+//     id: string
+//     email: string
+//     role: string
+//   }
+// }
 
-    const payload: CompletePublisherProfileRequest = {
-        publication_name: values.publication_name.trim(),
-        description: values.description.trim(),
-        regions_covered: values.regions_covered,
-        content_categories: values.content_categories,
-        monthly_sessions: values.monthly_sessions as number,
-        page_views: values.page_views as number,
-        content_inventory,
-        bank_name: values.bank_name.trim(),
-        ifsc_code: values.ifsc_code.trim(),
-        account_no: values.account_no.trim(),
-        holder_name: values.holder_name.trim(),
-    };
+// type PublisherProfileMeApiEnvelope = {
+//   data: PublisherProfileMe
+//   message: string
+// }
 
-    const website = values.website_url?.trim();
-    if (website) {
-        payload.website_url = website;
-    }
-
-    return payload;
+export type PublisherProfileSettingsInitials = {
+  personal: PersonalInformationValues
+  profile: Partial<ProfileInformationFormValues>
+  rss: Partial<RssFeedValues>
+  bank: Partial<BankDetailsValues>
 }
 
-/**
- * Submits publisher onboarding data. Auth is attached globally via `apiConfig`
- * when a session cookie is present.
- */
-export async function completePublisherProfile(
-    body: CompletePublisherProfileRequest,
-): Promise<unknown> {
-    const { data } = await apiConfig.post<unknown>(
-        COMPLETE_PUBLISHER_PROFILE_PATH,
-        body,
-    );
-    return data;
+export async function fetchPublisherProfileMe(): Promise<any> {
+  const { data } = await apiConfig.get<any>("/api/publisher/profile/me")
+  return data.data
+}
+
+export function mapPublisherProfileToSettingsInitials(
+  profile: any
+): PublisherProfileSettingsInitials {
+  const bankRow = profile.publisherBandDetails?.[0]
+
+  return {
+    personal: {
+      name: profile.user?.name ?? "",
+      email: profile.user?.email ?? "",
+    },
+    profile: {
+      website_url: profile.website_url ?? undefined,
+      publication_name: profile.publication_name ?? undefined,
+      description: profile.description ?? undefined,
+      regions_covered: profile.regions_covered ?? [],
+      content_categories: profile.content_categories ?? [],
+      monthly_sessions: profile.monthly_sessions ?? undefined,
+      page_views: profile.page_views ?? undefined,
+    },
+    rss: {
+      rss_feed_url: profile.rss_feed_url ?? undefined,
+    },
+    bank: bankRow
+      ? {
+          bank_name: bankRow.bank_name,
+          ifsc_code: bankRow.ifsc_code,
+          account_no: bankRow.account_no,
+          holder_name: bankRow.holder_name,
+        }
+      : {},
+  }
 }

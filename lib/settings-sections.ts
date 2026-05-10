@@ -1,6 +1,7 @@
 export type AccountSettingsSectionId =
   | "settings-personal"
   | "settings-profile"
+  | "settings-rss"
   | "settings-bank"
   | "settings-password"
 
@@ -22,6 +23,11 @@ export const ACCOUNT_SETTINGS_SECTIONS: AccountSettingsSection[] = [
     id: "settings-profile",
     navLabel: "Profile",
     cardTitle: "Profile information",
+  },
+  {
+    id: "settings-rss",
+    navLabel: "RSS feed",
+    cardTitle: "RSS feed",
   },
   {
     id: "settings-bank",

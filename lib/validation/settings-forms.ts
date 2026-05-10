@@ -90,6 +90,14 @@ export const setPasswordSchema = yup.object({
     .oneOf([yup.ref("new_password")], "Passwords must match"),
 })
 
+export const rssFeedSchema = yup.object({
+  rss_feed_url: yup
+    .string()
+    .transform((v) => (typeof v === "string" ? emptyToUndefined(v) : v) as string | undefined)
+    .optional()
+    .url("Enter a valid RSS feed URL"),
+})
+
 export type PersonalInformationValues = yup.InferType<
   typeof personalInformationSchema
 >
@@ -107,3 +115,4 @@ export type ProfileInformationFormValues = {
 
 export type BankDetailsValues = yup.InferType<typeof bankDetailsSchema>
 export type SetPasswordValues = yup.InferType<typeof setPasswordSchema>
+export type RssFeedValues = yup.InferType<typeof rssFeedSchema>

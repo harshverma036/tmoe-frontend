@@ -4,6 +4,7 @@ import type {
   BankDetailsValues,
   PersonalInformationValues,
   ProfileInformationFormValues,
+  RssFeedValues,
   SetPasswordValues,
 } from "@/lib/validation/settings-forms"
 
@@ -13,6 +14,7 @@ import type {
 const PATHS = {
   personal: "/api/users/me/personal",
   profile: "/api/users/me/profile",
+  rssFeed: "/api/users/me/rss-feed",
   bank: "/api/users/me/bank",
   password: "/api/users/me/password",
 } as const
@@ -28,6 +30,11 @@ export async function updateProfileInformation(
   body: ProfileInformationFormValues
 ): Promise<unknown> {
   const { data } = await apiConfig.patch<unknown>(PATHS.profile, body)
+  return data
+}
+
+export async function updateRssFeed(body: RssFeedValues): Promise<unknown> {
+  const { data } = await apiConfig.patch<unknown>(PATHS.rssFeed, body)
   return data
 }
 
