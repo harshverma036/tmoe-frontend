@@ -1,4 +1,10 @@
-import { LayoutDashboard, Settings, Users, type LucideIcon } from "lucide-react"
+import {
+  CalendarDays,
+  LayoutDashboard,
+  Settings,
+  Users,
+  type LucideIcon,
+} from "lucide-react"
 
 /** Roles used for dashboard access control (aligned with auth / user cookie). */
 export enum UserRole {
@@ -34,6 +40,12 @@ export const dashboardNavItems: DashboardNavItem[] = [
     allowed_roles: [UserRole.ADMIN],
   },
   {
+    label: "Slots",
+    href: "/content-slots",
+    icon: CalendarDays,
+    allowed_roles: [UserRole.PUBLISHER],
+  },
+  {
     label: "Settings",
     href: "/settings",
     icon: Settings,
@@ -60,8 +72,7 @@ export function normalizeUserRole(
 export function getDashboardNavItemsForRole(
   role: string | null | undefined
 ): DashboardNavItem[] {
-  const resolved =
-    normalizeUserRole(role) ?? UserRole.PUBLISHER
+  const resolved = normalizeUserRole(role) ?? UserRole.PUBLISHER
   return dashboardNavItems.filter((item) =>
     item.allowed_roles.includes(resolved)
   )
@@ -79,9 +90,7 @@ export function getDashboardPageTitle(
   userRole?: string | null
 ) {
   const items = getDashboardNavItemsForRole(userRole)
-  const sorted = [...items].sort(
-    (a, b) => b.href.length - a.href.length
-  )
+  const sorted = [...items].sort((a, b) => b.href.length - a.href.length)
   for (const item of sorted) {
     if (dashboardNavMatchesPath(pathname, item.href)) return item.label
   }
