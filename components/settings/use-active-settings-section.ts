@@ -24,12 +24,12 @@ function getNearestScrollContainer(el: HTMLElement | null): HTMLElement | Window
 }
 
 function readScrollMetrics(scrollRoot: HTMLElement | Window) {
-  if (scrollRoot === window) {
+  if (scrollRoot instanceof Window) {
     const doc = document.documentElement
     return {
       scrollTop: doc.scrollTop,
       scrollHeight: doc.scrollHeight,
-      clientHeight: window.innerHeight,
+      clientHeight: scrollRoot.innerHeight,
     }
   }
   return {
