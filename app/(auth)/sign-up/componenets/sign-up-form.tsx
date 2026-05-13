@@ -22,6 +22,7 @@ import apiConfig from "@/lib/apiConfig";
 import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { AxiosError } from "axios";
+import { AuthSplitLayout } from "@/components/auth/auth-split-layout";
 
 
 const signUpSchema = yup
@@ -81,8 +82,8 @@ const SignUpForm = () => {
   };
 
   return (
-    <div className="flex h-screen items-center justify-center">
-        <Card className="w-full max-w-sm">
+    <AuthSplitLayout>
+        <Card className="w-full">
           <CardHeader>
             <CardTitle>Create your account</CardTitle>
             <CardDescription>
@@ -150,7 +151,7 @@ const SignUpForm = () => {
             </CardFooter>
           </form>
         </Card>
-    </div>
+    </AuthSplitLayout>
   );
 };
 

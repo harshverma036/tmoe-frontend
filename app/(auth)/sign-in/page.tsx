@@ -16,6 +16,7 @@ import { AxiosError } from 'axios';
 import appConfig from '@/lib/appConfig';
 import Cookies from 'js-cookie';
 import { useRouter } from 'next/navigation';
+import { AuthSplitLayout } from '@/components/auth/auth-split-layout';
 
 const signInSchema = yup.object().shape({
     email: yup.string().email('Invalid email').required('Email is required'),
@@ -68,8 +69,8 @@ const SignIn = () => {
     }
 
     return (
-        <div className='h-screen flex items-center justify-center'>
-            <Card className="w-full max-w-sm">
+        <AuthSplitLayout>
+            <Card className="w-full">
                 <CardHeader>
                     <CardTitle>Login to your account</CardTitle>
                     <CardDescription>
@@ -135,7 +136,7 @@ const SignIn = () => {
                     </CardFooter>
                 </form>
             </Card>
-        </div>
+        </AuthSplitLayout>
     )
 }
 
