@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   LayoutDashboard,
+  Megaphone,
   Settings,
   Users,
   type LucideIcon,
@@ -44,6 +45,12 @@ export const dashboardNavItems: DashboardNavItem[] = [
     href: "/content-slots",
     icon: CalendarDays,
     allowed_roles: [UserRole.PUBLISHER],
+  },
+  {
+    label: "Campaign",
+    href: "/campaign",
+    icon: Megaphone,
+    allowed_roles: [UserRole.ADMIN, UserRole.BRAND],
   },
   {
     label: "Settings",
