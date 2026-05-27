@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AxiosError } from "axios"
@@ -28,10 +28,40 @@ import type { Campaign, CampaignStatus } from "@/lib/campaign.types"
 import { UserRole } from "@/lib/dashboard-nav"
 import { useDashboardUserRole } from "@/lib/hooks/use-dashboard-user-role"
 import { cn } from "@/lib/utils"
+import { getUserIdFromCookie } from "@/lib/user-info-cookie"
+import type { CampaignPublisherAssignment } from "@/lib/campaign.types"
+
+const PUBLISHER_ASSIGNMENT_RESPONSE_STATUSES = [
+  "DRAFT",
+  "ACTIVE",
+  "PAUSED",
+] as const
+
+function publisherAssignmentPending(
+  campaign: {
+    operational_at?: string | null
+    status: string
+    publishers?: CampaignPublisherAssignment[]
+  },
+  userId: string | null,
+) {
+  if (!userId || !campaign.operational_at) return false
+  if (
+    !PUBLISHER_ASSIGNMENT_RESPONSE_STATUSES.includes(
+      campaign.status as (typeof PUBLISHER_ASSIGNMENT_RESPONSE_STATUSES)[number],
+    )
+  ) {
+    return false
+  }
+  const mine = campaign.publishers?.find(
+    (p) => p.publisher_profile?.user?.id === userId,
+  )
+  return Boolean(mine && !mine.accepted_at)
+}
 
 const PAGE_SIZE = 12
 
-const FILTER_CHIPS: { value: CampaignStatus | "ALL"; label: string }[] = [
+const BRIEF_FILTERS: { value: CampaignStatus | "ALL"; label: string }[] = [
   { value: "ALL", label: "All" },
   { value: "DRAFT", label: "Draft" },
   { value: "UNDER_REVIEW", label: "Review" },
@@ -39,16 +69,14 @@ const FILTER_CHIPS: { value: CampaignStatus | "ALL"; label: string }[] = [
   { value: "REJECTED", label: "Rejected" },
 ]
 
-function matchesSearch(c: Campaign, q: string) {
-  if (!q.trim()) return true
-  const s = q.trim().toLowerCase()
-  return (
-    c.name.toLowerCase().includes(s) ||
-    c.target_market.toLowerCase().includes(s) ||
-    c.target_category.some((x) => x.toLowerCase().includes(s)) ||
-    c.product_skus.some((x) => x.toLowerCase().includes(s))
-  )
-}
+const OPERATIONAL_FILTERS: { value: CampaignStatus | "ALL"; label: string }[] = [
+  { value: "ALL", label: "All" },
+  { value: "DRAFT", label: "Draft" },
+  { value: "ACTIVE", label: "Active" },
+  { value: "PAUSED", label: "Paused" },
+  { value: "COMPLETED", label: "Completed" },
+  { value: "CANCELLED", label: "Cancelled" },
+]
 
 export function CampaignListClient() {
   const { role, isReady } = useDashboardUserRole()
@@ -58,38 +86,53 @@ export function CampaignListClient() {
   )
   const [skip, setSkip] = useState(0)
   const [search, setSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [deleteTarget, setDeleteTarget] = useState<Campaign | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setUserId(getUserIdFromCookie())
+  }, [])
 
   const statusParam =
     statusFilter === "ALL" ? undefined : (statusFilter as CampaignStatus)
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [search])
+
+  useEffect(() => {
+    setSkip(0)
+  }, [statusFilter, debouncedSearch])
+
   const { data, isFetching, isError, refetch } = useQuery({
     queryKey: campaignsQueryKey({
       status: statusParam,
+      search: debouncedSearch || undefined,
       limit: PAGE_SIZE,
       skip,
     }),
     queryFn: () =>
       fetchCampaigns({
         status: statusParam,
+        search: debouncedSearch || undefined,
         limit: PAGE_SIZE,
         skip,
       }),
     enabled:
       isReady &&
       !!role &&
-      (role === UserRole.ADMIN || role === UserRole.BRAND),
-    keepPreviousData: true,
+      (role === UserRole.ADMIN ||
+        role === UserRole.BRAND ||
+        role === UserRole.PUBLISHER),
   })
 
   const items = data?.items ?? []
   const total = data?.total ?? 0
   const hasMore = skip + items.length < total
-
-  const filtered = useMemo(
-    () => items.filter((c) => matchesSearch(c, search)),
-    [items, search],
-  )
 
   const removeMutation = useMutation({
     mutationFn: (id: string) => deleteCampaign(id),
@@ -107,9 +150,17 @@ export function CampaignListClient() {
     return <LoadingSkeleton variant="card-grid" cardCount={6} />
   }
 
-  if (role !== UserRole.ADMIN && role !== UserRole.BRAND) {
+  if (
+    role !== UserRole.ADMIN &&
+    role !== UserRole.BRAND &&
+    role !== UserRole.PUBLISHER
+  ) {
     return null
   }
+
+  const filterChips =
+    role === UserRole.PUBLISHER ? OPERATIONAL_FILTERS : BRIEF_FILTERS
+  const showOperationalFilters = role === UserRole.ADMIN
 
   return (
     <div className="animate-in fade-in-0 duration-500 space-y-8">
@@ -124,26 +175,40 @@ export function CampaignListClient() {
           <h2 className="text-2xl font-semibold tracking-tight">
             {role === UserRole.BRAND
               ? "Shape your next launch"
-              : "Review brand briefs"}
+              : role === UserRole.PUBLISHER
+                ? "My assigned campaigns"
+                : "Campaign management"}
           </h2>
           <p className="text-muted-foreground text-sm leading-relaxed">
             {role === UserRole.BRAND
               ? "Draft a brief, refine the details, and send it for admin review when you are ready."
-              : "Open any card to read the full brief and approve or reject campaigns in review."}
+              : role === UserRole.PUBLISHER
+                ? "Review assignments, accept campaigns, and track status."
+                : "Review briefs, create campaigns, assign publishers, and manage lifecycle."}
           </p>
         </div>
-        {role === UserRole.BRAND ? (
-          <Button asChild size="lg" className="shrink-0 shadow-sm">
-            <Link href="/campaign/new">New Campaign Brief</Link>
-          </Button>
-        ) : null}
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {role === UserRole.BRAND ? (
+            <Button asChild size="lg" className="shadow-sm">
+              <Link href="/campaign/new">New Campaign Brief</Link>
+            </Button>
+          ) : null}
+          {role === UserRole.ADMIN ? (
+            <Button asChild size="lg" variant="secondary" className="shadow-sm">
+              <Link href="/campaign/admin/new">Create campaign</Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-2">
-          {FILTER_CHIPS.map((chip) => (
+          {(showOperationalFilters
+            ? [...BRIEF_FILTERS, ...OPERATIONAL_FILTERS.filter((f) => f.value !== "ALL" && f.value !== "DRAFT")]
+            : filterChips
+          ).map((chip, idx) => (
             <Button
-              key={chip.value}
+              key={`${chip.value}-${idx}`}
               type="button"
               size="sm"
               variant={statusFilter === chip.value ? "default" : "outline"}
@@ -151,10 +216,7 @@ export function CampaignListClient() {
                 "rounded-full transition-transform duration-200",
                 statusFilter === chip.value && "shadow-sm",
               )}
-              onClick={() => {
-                setStatusFilter(chip.value)
-                setSkip(0)
-              }}
+              onClick={() => setStatusFilter(chip.value)}
             >
               {chip.label}
             </Button>
@@ -165,7 +227,7 @@ export function CampaignListClient() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, market, categories…"
+            placeholder="Search by brief name…"
             className="pl-9"
             aria-label="Search campaigns"
           />
@@ -194,7 +256,7 @@ export function CampaignListClient() {
 
       {isFetching && !items.length ? (
         <LoadingSkeleton variant="card-grid" cardCount={6} />
-      ) : !filtered.length && !isFetching ? (
+      ) : !items.length && !isFetching ? (
         <Card
           className={cn(
             "overflow-hidden border-dashed",
@@ -218,12 +280,17 @@ export function CampaignListClient() {
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {filtered.map((c, i) => (
+            {items.map((c, i) => (
               <CampaignCard
                 key={c.id}
                 campaign={c}
                 index={i}
                 role={role}
+                assignmentPending={
+                  role === UserRole.PUBLISHER
+                    ? publisherAssignmentPending(c, userId)
+                    : false
+                }
                 onDelete={
                   c.status === "DRAFT" &&
                   (role === UserRole.BRAND || role === UserRole.ADMIN)

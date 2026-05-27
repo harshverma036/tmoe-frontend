@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   LayoutDashboard,
+  LineChart,
   Megaphone,
   Settings,
   Users,
@@ -47,10 +48,16 @@ export const dashboardNavItems: DashboardNavItem[] = [
     allowed_roles: [UserRole.PUBLISHER],
   },
   {
-    label: "Campaign",
+    label: "Campaigns",
     href: "/campaign",
     icon: Megaphone,
-    allowed_roles: [UserRole.ADMIN, UserRole.BRAND],
+    allowed_roles: [UserRole.ADMIN, UserRole.BRAND, UserRole.PUBLISHER],
+  },
+  {
+    label: "ROI Benchmarks",
+    href: "/roi-benchmarks",
+    icon: LineChart,
+    allowed_roles: [UserRole.ADMIN],
   },
   {
     label: "Settings",

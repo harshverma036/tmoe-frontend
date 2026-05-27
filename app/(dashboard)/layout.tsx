@@ -4,6 +4,7 @@ import Link from "next/link"
 
 import { DashboardHeaderTitle } from "@/components/layout/dashboard-header-title"
 import { DashboardSidebarNav } from "@/components/layout/dashboard-sidebar-nav"
+import { NotificationBell } from "@/components/layout/notification-bell"
 import { DashboardUserMenu } from "@/components/layout/dashboard-user-menu"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -57,6 +58,7 @@ const layout = async ({
                         <SidebarTrigger />
                         <DashboardHeaderTitle userRole={user?.role} />
                         <div className="ml-auto flex items-center gap-1">
+                            <NotificationBell />
                             <ThemeToggle />
                             <DashboardUserMenu user={user} />
                         </div>

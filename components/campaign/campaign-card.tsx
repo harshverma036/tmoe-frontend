@@ -35,11 +35,16 @@ function statusBadgeVariant(
 ): "default" | "secondary" | "outline" | "destructive" {
   switch (status) {
     case "APPROVED":
+    case "COMPLETED":
       return "secondary"
     case "UNDER_REVIEW":
+    case "ACTIVE":
       return "default"
     case "REJECTED":
+    case "CANCELLED":
       return "destructive"
+    case "PAUSED":
+      return "outline"
     default:
       return "outline"
   }
@@ -58,6 +63,7 @@ export type CampaignCardProps = {
   campaign: Campaign
   index: number
   role: UserRole
+  assignmentPending?: boolean
   onEdit?: () => void
   onDelete?: () => void
 }
@@ -66,6 +72,7 @@ export function CampaignCard({
   campaign,
   index,
   role,
+  assignmentPending,
   onEdit,
   onDelete,
 }: CampaignCardProps) {
@@ -99,6 +106,10 @@ export function CampaignCard({
             campaign.status === "UNDER_REVIEW" &&
               "from-primary/90 to-primary/45",
             campaign.status === "DRAFT" && "from-muted-foreground/70 to-muted-foreground/30",
+            campaign.status === "ACTIVE" && "from-primary/90 to-primary/45",
+            campaign.status === "PAUSED" && "from-amber-500/80 to-amber-400/40",
+            campaign.status === "COMPLETED" && "from-emerald-500/90 to-emerald-400/40",
+            campaign.status === "CANCELLED" && "from-destructive to-destructive/50",
           )}
           aria-hidden
         />
@@ -114,6 +125,11 @@ export function CampaignCard({
               <Badge variant="outline" className="font-normal tabular-nums">
                 {campaign.target_market}
               </Badge>
+              {assignmentPending ? (
+                <Badge variant="default" className="font-normal">
+                  Action required
+                </Badge>
+              ) : null}
             </div>
             {showMenu ? (
               <DropdownMenu>

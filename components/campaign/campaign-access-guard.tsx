@@ -8,7 +8,11 @@ import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { UserRole } from "@/lib/dashboard-nav"
 import { useDashboardUserRole } from "@/lib/hooks/use-dashboard-user-role"
 
-const allowed = new Set<UserRole>([UserRole.ADMIN, UserRole.BRAND])
+const allowed = new Set<UserRole>([
+  UserRole.ADMIN,
+  UserRole.BRAND,
+  UserRole.PUBLISHER,
+])
 
 export function CampaignAccessGuard({
   children,
@@ -28,7 +32,7 @@ export function CampaignAccessGuard({
           Campaigns are restricted
         </h2>
         <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-          This area is available to brand and admin accounts only.
+          This area is available to brand, publisher, and admin accounts only.
         </p>
         <Button asChild className="mt-6">
           <Link href="/insights">Back to dashboard</Link>

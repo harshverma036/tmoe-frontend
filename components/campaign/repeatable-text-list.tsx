@@ -3,7 +3,6 @@
 import { Plus, Trash2 } from "lucide-react"
 import {
   type Control,
-  type FieldArrayPath,
   type UseFormRegister,
   useFieldArray,
 } from "react-hook-form"
@@ -14,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import type { CampaignBriefFormValues } from "@/lib/validation/campaign-brief-form"
 import { cn } from "@/lib/utils"
 
-type RepeatableFieldName = FieldArrayPath<CampaignBriefFormValues>
+type RepeatableFieldName = "target_category" | "product_skus" | "commerce_links"
 
 type RepeatableTextListProps = {
   control: Control<CampaignBriefFormValues>
@@ -41,8 +40,9 @@ export function RepeatableTextList({
   error,
   fullWidthRows,
 }: RepeatableTextListProps) {
-  const { fields, append, remove } = useFieldArray<CampaignBriefFormValues>({
+  const { fields, append, remove } = useFieldArray({
     control,
+    // @ts-expect-error FieldArrayPath resolves to never for CampaignBriefFormValues
     name,
   })
 
