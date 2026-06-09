@@ -444,34 +444,6 @@ export function CampaignDetailClient({ id }: { id: string }) {
                 {a.label}
               </Button>
             ))}
-            {canRespondToAssignment ? (
-              <>
-                <Button
-                  size="sm"
-                  className="gap-1.5"
-                  disabled={acceptMutation.isPending || rejectMutation.isPending}
-                  onClick={() => acceptMutation.mutate()}
-                >
-                  {acceptMutation.isPending ? (
-                    <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                  ) : (
-                    <CheckCircle2 className="size-3.5" aria-hidden />
-                  )}
-                  Accept
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                  disabled={acceptMutation.isPending || rejectMutation.isPending}
-                  onClick={() => setDeclineOpen(true)}
-                >
-                  <XCircle className="size-3.5" aria-hidden />
-                  Decline
-                </Button>
-              </>
-            ) : null}
           </div>
         </div>
       </div>

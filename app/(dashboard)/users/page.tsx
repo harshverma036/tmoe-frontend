@@ -41,7 +41,6 @@ const Users = () => {
     useState<PendingDeleteUser | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState("")
-
   const { isFetching, data: users } = useQuery({
     queryKey: ["all_users", query, sorting, pagination],
     queryFn: async () => {
@@ -156,7 +155,7 @@ const Users = () => {
       header: "Actions",
       cell: ({ row }: any) => {
         return (
-          <div className="">
+          <div className="flex items-center gap-1">
             <Button
               type="button"
               variant={"ghost"}

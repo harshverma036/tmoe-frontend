@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AxiosError } from "axios"
 import { format, parseISO } from "date-fns"
-import { CheckCircle2, Loader2, Plus } from "lucide-react"
+import { CheckCircle2, Loader2, Rss } from "lucide-react"
 import toast from "react-hot-toast"
 
 import { ConfirmDialog } from "@/components/common/ConfirmDialog"
@@ -28,14 +28,20 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  addDeliverablesFromRss,
   approveDeliverable,
-  createDeliverable,
+  campaignRssFeedQueryKey,
   deliverablesQueryKey,
+  fetchCampaignRssFeed,
   fetchDeliverables,
   needsRevisionDeliverable,
   rejectDeliverable,
   submitDeliverableUrl,
+  submitManualUrls,
+  triggerRssSync,
   type ContentDeliverable,
+  type DeliverableSource,
+  type RssFeedItem,
 } from "@/lib/api/deliverables"
 import type { Campaign } from "@/lib/campaign.types"
 import { UserRole } from "@/lib/dashboard-nav"
@@ -49,8 +55,25 @@ function deliverableBadgeVariant(
 ): "default" | "secondary" | "outline" | "destructive" {
   if (status === "DELIVERED") return "default"
   if (status === "SUBMITTED") return "secondary"
-  if (status === "REJECTED") return "destructive"
   return "outline"
+}
+
+function sourceLabel(source?: DeliverableSource): string | null {
+  if (source === "RSS_SELECTED") return "From RSS"
+  if (source === "MANUAL_SUBMIT") return "Manual"
+  if (source === "ADMIN_PLANNED") return "Planned"
+  return null
+}
+
+function parseUrlsFromText(text: string): string[] {
+  return [
+    ...new Set(
+      text
+        .split(/[\n,]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0),
+    ),
+  ]
 }
 
 function fmtDate(iso: string | null | undefined) {
@@ -74,9 +97,9 @@ export function CampaignDeliverablesSection({
   role,
 }: Props) {
   const queryClient = useQueryClient()
-  const [newType, setNewType] = useState("New Article")
-  const [newDesc, setNewDesc] = useState("")
-  const [newPublisherId, setNewPublisherId] = useState("")
+  const [manualUrlsText, setManualUrlsText] = useState("")
+  const [adminPublisherId, setAdminPublisherId] = useState("")
+  const [selectedRssIds, setSelectedRssIds] = useState<Set<string>>(new Set())
   const [urlById, setUrlById] = useState<Record<string, string>>({})
   const [reviewAction, setReviewAction] = useState<{
     id: string
@@ -92,22 +115,70 @@ export function CampaignDeliverablesSection({
       ["ACTIVE", "PAUSED", "COMPLETED", "DRAFT"].includes(campaign.status),
   })
 
-  const invalidate = () =>
+  const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: deliverablesQueryKey(campaignId) })
+    queryClient.invalidateQueries({ queryKey: campaignRssFeedQueryKey(campaignId) })
+  }
 
-  const createMutation = useMutation({
-    mutationFn: () =>
-      createDeliverable(campaignId, {
-        type: newType.trim(),
-        description: newDesc.trim() || undefined,
-        publisher_profile_id: newPublisherId || undefined,
-      }),
-    onSuccess: () => {
+  const { data: rssItems = [], isLoading: rssLoading } = useQuery({
+    queryKey: campaignRssFeedQueryKey(campaignId),
+    queryFn: () => fetchCampaignRssFeed(campaignId),
+    enabled:
+      role === UserRole.ADMIN &&
+      Boolean(campaign.operational_at) &&
+      ["ACTIVE", "PAUSED", "COMPLETED", "DRAFT"].includes(campaign.status),
+  })
+
+  const rssSyncMutation = useMutation({
+    mutationFn: triggerRssSync,
+    onSuccess: (r) => {
       invalidate()
-      setNewDesc("")
-      toast.success("Deliverable added")
+      toast.success(
+        `RSS sync finished (${r.publishersProcessed} publishers, ${r.errors} errors)`,
+      )
     },
-    onError: () => toast.error("Could not create deliverable"),
+    onError: () => toast.error("RSS sync failed"),
+  })
+
+  const manualUrlsMutation = useMutation({
+    mutationFn: (urls: string[]) =>
+      submitManualUrls(campaignId, {
+        urls,
+        ...(role === UserRole.ADMIN && adminPublisherId
+          ? { publisher_profile_id: adminPublisherId }
+          : {}),
+      }),
+    onSuccess: (result) => {
+      invalidate()
+      setManualUrlsText("")
+      if (result.created.length > 0) {
+        toast.success(
+          role === UserRole.ADMIN
+            ? `${result.created.length} article(s) added`
+            : `${result.created.length} article(s) submitted for approval`,
+        )
+      }
+      if (result.errors.length > 0) {
+        toast.error(
+          `${result.errors.length} URL(s) skipped: ${result.errors[0]?.message}`,
+        )
+      }
+    },
+    onError: (e: AxiosError<{ message?: string }>) => {
+      toast.error(e.response?.data?.message ?? "Could not add URLs")
+    },
+  })
+
+  const addFromRssMutation = useMutation({
+    mutationFn: (ids: string[]) => addDeliverablesFromRss(campaignId, ids),
+    onSuccess: (count) => {
+      invalidate()
+      setSelectedRssIds(new Set())
+      toast.success(
+        count > 0 ? `${count} article(s) added to campaign` : "No new articles added",
+      )
+    },
+    onError: () => toast.error("Could not add selected articles"),
   })
 
   const submitMutation = useMutation({
@@ -118,7 +189,9 @@ export function CampaignDeliverablesSection({
       toast.success("URL submitted")
     },
     onError: (e: AxiosError<{ message?: string }>) => {
-      toast.error(e.response?.data?.message ?? "Could not submit URL")
+      const status = e.response?.status
+      const msg = e.response?.data?.message ?? "Could not submit URL"
+      toast.error(status === 409 ? msg : msg)
     },
   })
 
@@ -182,6 +255,60 @@ export function CampaignDeliverablesSection({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {(role === UserRole.ADMIN || role === UserRole.PUBLISHER) ? (
+            <ManualUrlsForm
+              role={role}
+              text={manualUrlsText}
+              onTextChange={setManualUrlsText}
+              adminPublisherId={adminPublisherId}
+              onAdminPublisherChange={setAdminPublisherId}
+              publishers={campaign.publishers ?? []}
+              pending={manualUrlsMutation.isPending}
+              onSubmit={() => {
+                const urls = parseUrlsFromText(manualUrlsText)
+                if (urls.length === 0) {
+                  toast.error("Enter at least one article URL")
+                  return
+                }
+                if (role === UserRole.ADMIN && !adminPublisherId) {
+                  toast.error("Select a publisher")
+                  return
+                }
+                manualUrlsMutation.mutate(urls)
+              }}
+            />
+          ) : null}
+
+          {role === UserRole.ADMIN ? (
+            <AdminRssFeedPanel
+              items={rssItems}
+              loading={rssLoading}
+              selected={selectedRssIds}
+              onToggle={(id, checked) => {
+                setSelectedRssIds((prev) => {
+                  const next = new Set(prev)
+                  if (checked) next.add(id)
+                  else next.delete(id)
+                  return next
+                })
+              }}
+              syncPending={rssSyncMutation.isPending}
+              onSync={() => rssSyncMutation.mutate()}
+              addPending={addFromRssMutation.isPending}
+              onAddSelected={() => {
+                const ids = [...selectedRssIds].filter((id) => {
+                  const item = rssItems.find((i) => i.id === id)
+                  return item && !item.already_on_campaign
+                })
+                if (ids.length === 0) {
+                  toast.error("Select articles not already on this campaign")
+                  return
+                }
+                addFromRssMutation.mutate(ids)
+              }}
+            />
+          ) : null}
+
           {isLoading ? (
             <p className="text-muted-foreground text-sm">Loading deliverables…</p>
           ) : items.length === 0 ? (
@@ -220,71 +347,6 @@ export function CampaignDeliverablesSection({
               ))}
             </ul>
           )}
-
-          {role === UserRole.ADMIN ? (
-            <div className="space-y-3 rounded-lg border border-dashed p-4">
-              <p className="text-sm font-medium">Add deliverable</p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label>Type</Label>
-                  <Input
-                    value={newType}
-                    onChange={(e) => setNewType(e.target.value)}
-                    placeholder="e.g. New Article"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Publisher (optional)</Label>
-                  <Select
-                    value={newPublisherId || "__any__"}
-                    onValueChange={(v) =>
-                      setNewPublisherId(v === "__any__" ? "" : v)
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Any assigned publisher" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__any__">Any assigned publisher</SelectItem>
-                      {(campaign.publishers ?? []).map((p) => (
-                        <SelectItem
-                          key={p.publisher_profile_id}
-                          value={p.publisher_profile_id}
-                        >
-                          {p.publisher_profile?.publication_name ??
-                            p.publisher_profile?.user?.name ??
-                            "Publisher"}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Description</Label>
-                <Textarea
-                  value={newDesc}
-                  onChange={(e) => setNewDesc(e.target.value)}
-                  rows={2}
-                  placeholder="e.g. 2 × skincare review article"
-                />
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                className="gap-1.5"
-                disabled={!newType.trim() || createMutation.isPending}
-                onClick={() => createMutation.mutate()}
-              >
-                {createMutation.isPending ? (
-                  <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                ) : (
-                  <Plus className="size-3.5" aria-hidden />
-                )}
-                Add deliverable
-              </Button>
-            </div>
-          ) : null}
 
           {role === UserRole.BRAND ? (
             <p className="text-muted-foreground text-xs">
@@ -365,9 +427,7 @@ function DeliverableRow({
     d.publisher_profile?.publication_name ??
     d.publisher_profile?.user?.name ??
     null
-  const canSubmit =
-    role === UserRole.PUBLISHER &&
-    (d.status === "PENDING" || d.status === "REJECTED")
+  const canSubmit = role === UserRole.PUBLISHER && d.status === "PENDING"
   const showAdminActions = role === UserRole.ADMIN && d.status === "SUBMITTED"
   const isDelivered = d.status === "DELIVERED"
   const brandPending = role === UserRole.BRAND && !isDelivered
@@ -393,12 +453,45 @@ function DeliverableRow({
             <p className="text-muted-foreground mt-1 text-xs">{pubName}</p>
           ) : null}
         </div>
-        <Badge variant={deliverableBadgeVariant(d.status)}>
-          {d.status === "SUBMITTED"
-            ? "Submitted — Pending approval"
-            : statusLabel(d.status)}
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          {sourceLabel(d.source) ? (
+            <Badge variant="outline">{sourceLabel(d.source)}</Badge>
+          ) : null}
+          <Badge variant={deliverableBadgeVariant(d.status)}>
+            {d.status === "SUBMITTED"
+              ? "Submitted — Pending approval"
+              : statusLabel(d.status)}
+          </Badge>
+        </div>
       </div>
+
+      {d.thumbnail_url && (role !== UserRole.BRAND || isDelivered) ? (
+        <img
+          src={d.thumbnail_url}
+          alt=""
+          className="h-20 w-32 rounded-md object-cover"
+        />
+      ) : null}
+
+      {d.metadata_status === "PENDING" &&
+      d.submitted_url &&
+      role !== UserRole.BRAND ? (
+        <p className="text-muted-foreground text-xs">
+          Fetching article details from RSS feed…
+        </p>
+      ) : null}
+
+      {d.metadata_status === "FAILED" && role !== UserRole.BRAND ? (
+        <p className="text-muted-foreground text-xs">
+          Could not load metadata from feed — link is still recorded.
+        </p>
+      ) : null}
+
+      {d.article_excerpt && isDelivered ? (
+        <p className="text-muted-foreground line-clamp-2 text-sm">
+          {d.article_excerpt}
+        </p>
+      ) : null}
 
       {d.admin_note && role !== UserRole.BRAND ? (
         <p className="text-destructive text-sm">Note: {d.admin_note}</p>
@@ -421,12 +514,23 @@ function DeliverableRow({
         </p>
       ) : null}
 
+      {d.submitted_url && showAdminActions ? (
+        <a
+          href={d.submitted_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary text-sm underline-offset-4 hover:underline"
+        >
+          Preview submitted article
+        </a>
+      ) : null}
+
       {canSubmit ? (
         <div className="flex flex-col gap-2 sm:flex-row">
           <Input
             type="url"
             placeholder="https://…"
-            value={url}
+            value={url || d.submitted_url || ""}
             onChange={(e) => onUrlChange(e.target.value)}
           />
           <Button
@@ -464,5 +568,173 @@ function DeliverableRow({
         </div>
       ) : null}
     </li>
+  )
+}
+
+function ManualUrlsForm({
+  role,
+  text,
+  onTextChange,
+  adminPublisherId,
+  onAdminPublisherChange,
+  publishers,
+  pending,
+  onSubmit,
+}: {
+  role: UserRole
+  text: string
+  onTextChange: (v: string) => void
+  adminPublisherId: string
+  onAdminPublisherChange: (v: string) => void
+  publishers: Campaign["publishers"]
+  pending: boolean
+  onSubmit: () => void
+}) {
+  return (
+    <div className="space-y-3 rounded-lg border border-dashed p-4">
+      <p className="text-sm font-medium">Add article URLs manually</p>
+      <p className="text-muted-foreground text-xs">
+        One URL per line. Title, image, and summary are fetched from each article
+        page automatically.{" "}
+        {role === UserRole.PUBLISHER
+          ? "Submissions need admin approval before the brand can see them."
+          : "Articles you add are marked delivered and visible to the brand immediately."}
+      </p>
+      {role === UserRole.ADMIN ? (
+        <div className="space-y-1.5">
+          <Label>Publisher</Label>
+          <Select
+            value={adminPublisherId || "__none__"}
+            onValueChange={(v) =>
+              onAdminPublisherChange(v === "__none__" ? "" : v)
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select publisher" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">Select publisher…</SelectItem>
+              {(publishers ?? []).map((p) => (
+                <SelectItem
+                  key={p.publisher_profile_id}
+                  value={p.publisher_profile_id}
+                >
+                  {p.publisher_profile?.publication_name ??
+                    p.publisher_profile?.user?.name ??
+                    "Publisher"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+      <Textarea
+        value={text}
+        onChange={(e) => onTextChange(e.target.value)}
+        rows={4}
+        placeholder={"https://example.com/article-1\nhttps://example.com/article-2"}
+      />
+      <Button type="button" size="sm" disabled={pending} onClick={onSubmit}>
+        {pending ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
+        Add article(s)
+      </Button>
+    </div>
+  )
+}
+
+function AdminRssFeedPanel({
+  items,
+  loading,
+  selected,
+  onToggle,
+  syncPending,
+  onSync,
+  addPending,
+  onAddSelected,
+}: {
+  items: RssFeedItem[]
+  loading: boolean
+  selected: Set<string>
+  onToggle: (id: string, checked: boolean) => void
+  syncPending: boolean
+  onSync: () => void
+  addPending: boolean
+  onAddSelected: () => void
+}) {
+  const available = items.filter((i) => !i.already_on_campaign)
+  return (
+    <div className="space-y-3 rounded-lg border p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium">Publisher RSS feed</p>
+          <p className="text-muted-foreground text-xs">
+            Sync feeds, then select articles to add as campaign deliverables (visible to brand).
+          </p>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="gap-1.5"
+          disabled={syncPending}
+          onClick={onSync}
+        >
+          {syncPending ? (
+            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+          ) : (
+            <Rss className="size-3.5" aria-hidden />
+          )}
+          Refresh feeds
+        </Button>
+      </div>
+      {loading ? (
+        <p className="text-muted-foreground text-sm">Loading feed articles…</p>
+      ) : items.length === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          No RSS articles yet. Ensure publishers have an RSS URL in settings, then click Refresh feeds.
+        </p>
+      ) : (
+        <ul className="max-h-80 space-y-2 overflow-y-auto">
+          {items.map((item) => {
+            const pub =
+              item.publisher_profile?.publication_name ??
+              item.publisher_profile?.user?.name ??
+              "Publisher"
+            const disabled = item.already_on_campaign
+            return (
+              <li
+                key={item.id}
+                className={`flex gap-3 rounded-md border p-3 text-sm ${disabled ? "opacity-60" : ""}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.has(item.id)}
+                  disabled={disabled}
+                  onChange={(e) => onToggle(item.id, e.target.checked)}
+                  className="mt-1 size-4 shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">{item.title ?? item.article_url}</p>
+                  <p className="text-muted-foreground text-xs">{pub}</p>
+                  {disabled ? (
+                    <Badge variant="secondary" className="mt-1">
+                      Already on campaign
+                    </Badge>
+                  ) : null}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <Button
+        type="button"
+        size="sm"
+        disabled={addPending || selected.size === 0 || available.length === 0}
+        onClick={onAddSelected}
+      >
+        Add selected to campaign
+      </Button>
+    </div>
   )
 }

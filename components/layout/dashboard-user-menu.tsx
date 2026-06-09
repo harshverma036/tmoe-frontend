@@ -3,7 +3,6 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import Cookies from "js-cookie"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -14,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import appConfig from "@/lib/appConfig"
+import { clearAuthSession } from "@/lib/clear-auth-session"
 
 export type DashboardUser = {
   name?: string | null
@@ -65,14 +64,7 @@ export function DashboardUserMenu({ user }: DashboardUserMenuProps) {
   const monogram = getAvatarMonogram(user?.email)
 
   const handleLogout = () => {
-    Cookies.remove(appConfig.cookies.userTokenKey, { path: "/" })
-    Cookies.remove(appConfig.cookies.userInfoKey, { path: "/" })
-    try {
-      localStorage.clear()
-      sessionStorage.clear()
-    } catch {
-      /* ignore quota / private mode */
-    }
+    clearAuthSession()
     router.replace("/sign-in")
   }
 
