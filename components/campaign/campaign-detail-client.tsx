@@ -112,14 +112,16 @@ function DetailBlock({
   return (
     <div
       className={cn(
-        "animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both duration-500 rounded-xl border border-border/80 bg-card/80 p-4 shadow-sm backdrop-blur-sm",
+        "animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both min-w-0 duration-500 overflow-hidden rounded-xl border border-border/80 bg-card/80 p-4 shadow-sm backdrop-blur-sm",
         delayClass,
       )}
     >
       <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
         {label}
       </p>
-      <div className="mt-2 text-sm leading-relaxed">{children}</div>
+      <div className="mt-2 min-w-0 text-sm leading-relaxed wrap-break-word">
+        {children}
+      </div>
     </div>
   )
 }
@@ -735,7 +737,9 @@ export function CampaignDetailClient({ id }: { id: string }) {
         <DetailBlock label="Product SKUs">
           <ul className="list-inside list-disc space-y-1">
             {campaign.product_skus.map((s) => (
-              <li key={s}>{s}</li>
+              <li key={s} className="wrap-break-word">
+                {s}
+              </li>
             ))}
           </ul>
         </DetailBlock>
@@ -762,12 +766,12 @@ export function CampaignDetailClient({ id }: { id: string }) {
       <DetailBlock label="Commerce links">
         <ul className="space-y-2">
           {campaign.commerce_links.map((href) => (
-            <li key={href}>
+            <li key={href} className="min-w-0">
               <a
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-primary font-medium underline-offset-4 hover:underline"
+                className="text-primary block max-w-full font-medium wrap-anywhere underline-offset-4 hover:underline"
               >
                 {href}
               </a>

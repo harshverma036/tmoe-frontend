@@ -127,4 +127,14 @@
   html {
     @apply font-sans;
     }
+
+  /* Long URLs and unbroken strings wrap instead of overflowing containers */
+  :where(p, li, a, span, td, th, dd, dt, label, small, strong, em) {
+    overflow-wrap: anywhere;
+  }
+
+  /* Grid children can shrink below intrinsic content width */
+  .grid > * {
+    min-width: 0;
+  }
 }

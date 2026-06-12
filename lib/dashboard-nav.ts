@@ -2,6 +2,7 @@ import {
   CalendarDays,
   LayoutDashboard,
   LineChart,
+  Link2,
   Megaphone,
   Settings,
   Users,
@@ -52,6 +53,12 @@ export const dashboardNavItems: DashboardNavItem[] = [
     href: "/campaign",
     icon: Megaphone,
     allowed_roles: [UserRole.ADMIN, UserRole.BRAND, UserRole.PUBLISHER],
+  },
+  {
+    label: "Promote Links",
+    href: "/promote-links",
+    icon: Link2,
+    allowed_roles: [UserRole.ADMIN, UserRole.PUBLISHER],
   },
   {
     label: "ROI Benchmarks",
