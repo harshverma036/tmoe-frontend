@@ -19,17 +19,9 @@ export default function ConvertBriefPage({
   })
 
   if (isLoading) return <LoadingSkeleton variant="default" />
-  if (!campaign) return <p className="text-muted-foreground text-sm">Campaign not found.</p>
+  if (!campaign) {
+    return <p className="text-muted-foreground text-sm">Campaign not found.</p>
+  }
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Convert brief to campaign</h1>
-        <p className="text-muted-foreground text-sm">
-          Pre-filled from approved brief: {campaign.name}
-        </p>
-      </div>
-      <AdminCampaignWizard brief={campaign} />
-    </div>
-  )
+  return <AdminCampaignWizard brief={campaign} />
 }

@@ -21,7 +21,8 @@ import { fetchRoiBenchmarks } from "@/lib/api/roi-benchmarks"
 import type { EstimateCampaignBody, RoiEstimate } from "@/lib/campaign.types"
 
 type Props = {
-  campaignId: string
+  /** Omit before the campaign exists; category selection still works. */
+  campaignId?: string
   defaultBody: EstimateCampaignBody
   onEstimated?: (estimate: RoiEstimate) => void
   onCategoryChange?: (category: string) => void
@@ -59,15 +60,18 @@ export function RoiEstimatorWidget({
 
   useEffect(() => {
     if (!benchmarks.length) return
-    const hint = defaultBody.category?.trim()
-    const match = hint
-      ? benchmarks.find(
-          (b) => b.category.toLowerCase() === hint.toLowerCase(),
-        )
-      : undefined
-    const next = match?.category ?? benchmarks[0]?.category ?? ""
-    setRoiCategory(next)
-    onCategoryChange?.(next)
+    setRoiCategory((current) => {
+      if (current) return current
+      const hint = defaultBody.category?.trim()
+      const match = hint
+        ? benchmarks.find(
+            (b) => b.category.toLowerCase() === hint.toLowerCase(),
+          )
+        : undefined
+      const next = match?.category ?? benchmarks[0]?.category ?? ""
+      onCategoryChange?.(next)
+      return next
+    })
   }, [benchmarks, defaultBody.category, onCategoryChange])
 
   function handleCategoryChange(value: string) {
@@ -76,8 +80,15 @@ export function RoiEstimatorWidget({
   }
 
   const mutation = useMutation({
-    mutationFn: () =>
-      estimateCampaign(campaignId, buildEstimateBody(defaultBody, roiCategory)),
+    mutationFn: () => {
+      if (!campaignId) {
+        throw new Error("Save the campaign first to calculate ROI")
+      }
+      return estimateCampaign(
+        campaignId,
+        buildEstimateBody(defaultBody, roiCategory),
+      )
+    },
     onSuccess: (data) => {
       setEstimate(data)
       onEstimated?.(data)
@@ -139,7 +150,10 @@ export function RoiEstimatorWidget({
         type="button"
         onClick={() => mutation.mutate()}
         disabled={
-          mutation.isPending || !roiCategory || benchmarks.length === 0
+          mutation.isPending ||
+          !campaignId ||
+          !roiCategory ||
+          benchmarks.length === 0
         }
       >
         {mutation.isPending ? (
@@ -147,6 +161,12 @@ export function RoiEstimatorWidget({
         ) : null}
         Calculate ROI
       </Button>
+      {!campaignId && benchmarks.length > 0 ? (
+        <p className="text-muted-foreground text-xs">
+          Save the campaign as draft to run the calculation, or estimates will
+          run automatically when you save.
+        </p>
+      ) : null}
       {metrics.length ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {metrics.map((m) => (
