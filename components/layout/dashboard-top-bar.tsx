@@ -20,7 +20,7 @@ function getRoleLabel(role: string | null | undefined) {
   const resolved = normalizeUserRole(role)
   switch (resolved) {
     case UserRole.ADMIN:
-      return "Ops admin · L3"
+      return "Admin"
     case UserRole.PUBLISHER:
       return "Publisher"
     case UserRole.BRAND:

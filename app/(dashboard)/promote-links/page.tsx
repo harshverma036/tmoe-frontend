@@ -1,22 +1,31 @@
 "use client"
 
+import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { AxiosError } from "axios"
 import { format } from "date-fns"
-import { Copy, Link2, Plus, Settings2 } from "lucide-react"
-import { useState } from "react"
+import { Copy, Plus, Settings2 } from "lucide-react"
 import toast from "react-hot-toast"
 
 import DataTable from "@/components/common/DataTable"
+import { PageHeader } from "@/components/layout/page-header"
 import { AddPropertyDialog } from "@/components/promote-links/add-property-dialog"
 import { BrandImpactConfigDialog } from "@/components/promote-links/brand-impact-config-dialog"
 import { CreatePromoteLinkDialog } from "@/components/promote-links/create-promote-link-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useDataTableState } from "@/hooks/use-data-table-state"
 import {
+  fetchPromoteLinkBrands,
   fetchPromoteLinks,
+  promoteLinkBrandsQueryKey,
   promoteLinksQueryKey,
   type PromoteLink,
 } from "@/lib/api/promote-links"
@@ -28,10 +37,24 @@ function truncateUrl(url: string, max = 48) {
   return `${url.slice(0, max)}…`
 }
 
+function matchesSearch(link: PromoteLink, query: string): boolean {
+  if (!query.trim()) return true
+  const q = query.trim().toLowerCase()
+  return (
+    (link.brand_profile?.brand_name ?? "").toLowerCase().includes(q) ||
+    (link.publisher_profile?.publication_name ?? "").toLowerCase().includes(q) ||
+    (link.publisher_profile?.user?.email ?? "").toLowerCase().includes(q) ||
+    link.generated_url.toLowerCase().includes(q) ||
+    String(link.click_count).includes(q)
+  )
+}
+
 export default function PromoteLinksPage() {
   const { role, isReady } = useDashboardUserRole()
   const queryClient = useQueryClient()
-  const { pagination, setPagination } = useDataTableState()
+  const { pagination, setPagination, query, setQuery, resetToFirstPage } =
+    useDataTableState()
+  const [brandFilter, setBrandFilter] = useState("")
   const [createOpen, setCreateOpen] = useState(false)
   const [configOpen, setConfigOpen] = useState(false)
   const [propertyOpen, setPropertyOpen] = useState(false)
@@ -39,9 +62,20 @@ export default function PromoteLinksPage() {
   const page = pagination.pageIndex + 1
   const pageSize = pagination.pageSize
 
+  const { data: brands = [] } = useQuery({
+    queryKey: promoteLinkBrandsQueryKey,
+    queryFn: fetchPromoteLinkBrands,
+    enabled: isReady && (role === UserRole.ADMIN || role === UserRole.PUBLISHER),
+  })
+
   const { data, isFetching, isError, refetch } = useQuery({
-    queryKey: [...promoteLinksQueryKey, page, pageSize],
-    queryFn: () => fetchPromoteLinks({ page, pageSize }),
+    queryKey: [...promoteLinksQueryKey, page, pageSize, brandFilter],
+    queryFn: () =>
+      fetchPromoteLinks({
+        page,
+        pageSize,
+        brand_profile_id: brandFilter || undefined,
+      }),
     enabled: isReady && (role === UserRole.ADMIN || role === UserRole.PUBLISHER),
   })
 
@@ -53,25 +87,13 @@ export default function PromoteLinksPage() {
     onError: () => toast.error("Could not copy link"),
   })
 
-  if (!isReady) {
-    return <LoadingSkeleton className="h-48 w-full" />
-  }
-
-  if (role !== UserRole.ADMIN && role !== UserRole.PUBLISHER) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Promote Links</CardTitle>
-          <CardDescription>
-            Promote links are available to admins and publishers only.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    )
-  }
-
   const links = data?.data ?? []
   const total = data?.total ?? 0
+
+  const filteredLinks = useMemo(
+    () => links.filter((link) => matchesSearch(link, query)),
+    [links, query],
+  )
 
   const columns = () => [
     {
@@ -137,82 +159,146 @@ export default function PromoteLinksPage() {
     },
   ]
 
+  if (!isReady) {
+    return <LoadingSkeleton className="h-48 w-full" />
+  }
+
+  if (role !== UserRole.ADMIN && role !== UserRole.PUBLISHER) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Promote Links</CardTitle>
+          <CardDescription>
+            Promote links are available to admins and publishers only.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    )
+  }
+
+  const breadcrumbLabel =
+    role === UserRole.ADMIN ? "TMOE Admin" : "Publisher Studio"
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold tracking-tight">
-            Promote Links
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Create and manage Impact.com affiliate promote links for brands.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {role === UserRole.ADMIN ? (
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        breadcrumbs={
+          <>
+            {breadcrumbLabel} <span className="mx-1.5">/</span> Promote Links
+          </>
+        }
+        title="Promote Links"
+        description="Create and manage Impact.com affiliate promote links for brands."
+        actions={
+          <>
+            {role === UserRole.ADMIN ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 gap-2 rounded-xl px-4 shadow-none"
+                onClick={() => setConfigOpen(true)}
+              >
+                <Settings2 className="size-4" />
+                Configure brands
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 gap-2 rounded-xl px-4 shadow-none"
+                onClick={() => setPropertyOpen(true)}
+              >
+                <Settings2 className="size-4" />
+                Add property
+              </Button>
+            )}
             <Button
               type="button"
-              variant="outline"
-              onClick={() => setConfigOpen(true)}
+              size="sm"
+              className="h-9 gap-2 rounded-xl px-4 shadow-none"
+              onClick={() => setCreateOpen(true)}
             >
-              <Settings2 className="mr-1 size-4" />
-              Configure brands
+              <Plus className="size-4" />
+              Create a link
             </Button>
-          ) : (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setPropertyOpen(true)}
-            >
-              <Settings2 className="mr-1 size-4" />
-              Add property
-            </Button>
-          )}
-          <Button type="button" onClick={() => setCreateOpen(true)}>
-            <Plus className="mr-1 size-4" />
-            Create a link
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {isError ? (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Link2 className="size-4" />
-              Could not load links
-            </CardTitle>
+            <CardTitle className="text-base">Could not load links</CardTitle>
             <CardDescription>
-              <Button type="button" variant="link" className="h-auto p-0" onClick={() => refetch()}>
-                Try again
-              </Button>
+              Check your connection and try again.
             </CardDescription>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-2 w-fit"
+              onClick={() => refetch()}
+            >
+              Retry
+            </Button>
           </CardHeader>
         </Card>
       ) : isFetching && links.length === 0 ? (
         <LoadingSkeleton className="h-48 w-full" />
-      ) : links.length === 0 ? (
+      ) : links.length === 0 && !brandFilter && !query ? (
         <Card>
           <CardHeader>
             <CardTitle>No promote links yet</CardTitle>
             <CardDescription>
               Create your first Impact.com promote link for a brand.
             </CardDescription>
-            <Button type="button" className="mt-2 w-fit" onClick={() => setCreateOpen(true)}>
-              <Plus className="mr-1 size-4" />
+            <Button
+              type="button"
+              className="mt-2 w-fit gap-2"
+              onClick={() => setCreateOpen(true)}
+            >
+              <Plus className="size-4" />
               Create a link
             </Button>
           </CardHeader>
         </Card>
       ) : (
         <DataTable
-          data={links}
+          title="promote links"
+          data={filteredLinks}
           columns={columns()}
           pagination={pagination}
           setPagination={setPagination}
           totalCount={total}
-          count={links.length}
+          count={filteredLinks.length}
+          query={query}
+          setQuery={setQuery}
           isFetching={isFetching}
+          actionButtons={
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-foreground">Brand</span>
+              <Select
+                value={brandFilter || "all"}
+                onValueChange={(value) => {
+                  setBrandFilter(value === "all" ? "" : value)
+                  resetToFirstPage()
+                }}
+              >
+                <SelectTrigger className="h-9 w-[220px]">
+                  <SelectValue placeholder="All brands" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All brands</SelectItem>
+                  {brands.map((brand) => (
+                    <SelectItem key={brand.id} value={brand.id}>
+                      {brand.brand_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          }
         />
       )}
 
