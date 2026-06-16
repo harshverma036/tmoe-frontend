@@ -2,11 +2,8 @@ import React from "react"
 import Image from "next/image"
 import Link from "next/link"
 
-import { DashboardHeaderTitle } from "@/components/layout/dashboard-header-title"
 import { DashboardSidebarNav } from "@/components/layout/dashboard-sidebar-nav"
-import { NotificationBell } from "@/components/layout/notification-bell"
-import { DashboardUserMenu } from "@/components/layout/dashboard-user-menu"
-import { ThemeToggle } from "@/components/layout/theme-toggle"
+import { DashboardTopBarContainer } from "@/components/layout/dashboard-top-bar-container"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import {
     Sidebar,
@@ -14,7 +11,6 @@ import {
     SidebarInset,
     SidebarProvider,
     SidebarRail,
-    SidebarTrigger,
 } from "@/components/ui/sidebar"
 import appConfig from "@/lib/appConfig"
 import { cookies } from 'next/headers';
@@ -53,18 +49,10 @@ const layout = async ({
                     <SidebarRail />
                 </Sidebar>
 
-                <SidebarInset>
-                    <header className="bg-background/95 sticky top-0 z-20 flex h-14 items-center gap-3 border-b px-4 backdrop-blur">
-                        <SidebarTrigger />
-                        <DashboardHeaderTitle userRole={user?.role} />
-                        <div className="ml-auto flex items-center gap-1">
-                            <NotificationBell />
-                            <ThemeToggle />
-                            <DashboardUserMenu user={user} />
-                        </div>
-                    </header>
+                <SidebarInset className="bg-background">
+                    <DashboardTopBarContainer user={user} />
 
-                    <div className="flex-1 p-4 sm:p-6">{children}</div>
+                    <div className="flex-1 px-4 py-5 sm:px-6 sm:py-6">{children}</div>
                 </SidebarInset>
             </SidebarProvider>
         </TooltipProvider>
