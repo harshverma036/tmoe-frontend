@@ -91,7 +91,7 @@ export default function PromoteLinksPage() {
   const total = data?.total ?? 0
 
   const filteredLinks = useMemo(
-    () => links.filter((link) => matchesSearch(link, query)),
+    () => links.filter((link: any) => matchesSearch(link, query)),
     [links, query],
   )
 
