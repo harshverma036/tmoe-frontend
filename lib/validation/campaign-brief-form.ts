@@ -52,6 +52,9 @@ export type CampaignBriefFormValues = {
   commerce_links: string[]
   submit_for_review: boolean
   description: string
+  primary_keywords: string[]
+  secondary_keywords: string[]
+  search_intent?: string
 }
 
 export const campaignBriefEmptyValues: CampaignBriefFormValues = {
@@ -66,6 +69,9 @@ export const campaignBriefEmptyValues: CampaignBriefFormValues = {
   commerce_links: [""],
   submit_for_review: false,
   description: "",
+  primary_keywords: [],
+  secondary_keywords: [],
+  search_intent: "",
 }
 
 /** Create flow — matches POST `/api/campaign` contract. */
@@ -99,6 +105,9 @@ export const campaignBriefCreateSchema = yup
     commerce_links: urlList,
     submit_for_review: yup.boolean().default(false),
     description: yup.string().trim().optional().default(""),
+    primary_keywords: yup.array().of(yup.string().trim()).default([]),
+    secondary_keywords: yup.array().of(yup.string().trim()).default([]),
+    search_intent: yup.string().trim().optional().default(""),
   })
   .test(
     "budget-range",

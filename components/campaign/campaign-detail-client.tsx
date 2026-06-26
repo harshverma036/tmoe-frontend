@@ -62,6 +62,8 @@ import { UserRole } from "@/lib/dashboard-nav"
 import { useDashboardUserRole } from "@/lib/hooks/use-dashboard-user-role"
 import { cn } from "@/lib/utils"
 import { PublisherMultiSelect } from "@/components/campaign/publisher-multi-select"
+import { CampaignApplicationsPanel } from "@/components/campaign/campaign-applications-panel"
+import { CampaignAeoSection } from "@/components/campaign/campaign-aeo-section"
 import { fetchPublishersForAssignment } from "@/lib/api/publisher-search"
 import { getUserIdFromCookie } from "@/lib/user-info-cookie"
 import type { CampaignPublisherAssignment } from "@/lib/campaign.types"
@@ -139,9 +141,9 @@ export function CampaignDetailClient({ id }: { id: string }) {
   )
   const [statusChoice, setStatusChoice] = useState<CampaignStatus | null>(null)
   const [statusNote, setStatusNote] = useState("")
-  const [detailTab, setDetailTab] = useState<"overview" | "performance" | "content">(
-    "overview",
-  )
+  const [detailTab, setDetailTab] = useState<
+    "overview" | "performance" | "content" | "applications"
+  >("overview")
   const [publisherSearch, setPublisherSearch] = useState("")
   const [pickPublishers, setPickPublishers] = useState<string[]>([])
   const [declineOpen, setDeclineOpen] = useState(false)
@@ -327,6 +329,12 @@ export function CampaignDetailClient({ id }: { id: string }) {
     role === UserRole.ADMIN &&
     isBrief &&
     campaign.status === "APPROVED"
+
+  const showApplicationsTab =
+    role === UserRole.ADMIN &&
+    isOperational &&
+    campaign.status === "ACTIVE" &&
+    !(campaign.publishers && campaign.publishers.length > 0)
 
   const adminStatusActions: { status: CampaignStatus; label: string }[] = []
   if (role === UserRole.ADMIN && isOperational) {
@@ -516,6 +524,9 @@ export function CampaignDetailClient({ id }: { id: string }) {
             {(
               [
                 { id: "overview" as const, label: "Overview" },
+                ...(showApplicationsTab
+                  ? [{ id: "applications" as const, label: "Applications" }]
+                  : []),
                 { id: "performance" as const, label: "Performance" },
                 { id: "content" as const, label: "Content" },
               ] as const
@@ -534,6 +545,10 @@ export function CampaignDetailClient({ id }: { id: string }) {
 
           {detailTab === "performance" ? (
             <CampaignPerformancePanel campaign={campaign} />
+          ) : null}
+
+          {detailTab === "applications" && showApplicationsTab ? (
+            <CampaignApplicationsPanel campaignId={id} />
           ) : null}
 
           {detailTab === "content" ? (
@@ -583,6 +598,8 @@ export function CampaignDetailClient({ id }: { id: string }) {
               {campaign.content_type ?? "—"}
             </DetailBlock>
           </div>
+
+          <CampaignAeoSection campaign={campaign} />
 
           {(campaign.est_gmv != null || role === UserRole.ADMIN) && (
             <Card>
@@ -779,6 +796,8 @@ export function CampaignDetailClient({ id }: { id: string }) {
           ))}
         </ul>
       </DetailBlock>
+
+      {!isOperational ? <CampaignAeoSection campaign={campaign} /> : null}
 
       <Separator />
 

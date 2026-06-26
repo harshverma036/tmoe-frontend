@@ -8,6 +8,7 @@ import { ArrowRight, Loader2 } from "lucide-react"
 import toast from "react-hot-toast"
 
 import { PublisherMultiSelect } from "@/components/campaign/publisher-multi-select"
+import { SkuTagInput } from "@/components/campaign/sku-tag-input"
 import { RoiEstimatorWidget } from "@/components/campaign/roi-estimator-widget"
 import {
   WizardFooterNav,
@@ -31,10 +32,13 @@ import {
   convertFromBrief,
   createAdminCampaign,
   estimateCampaign,
+  updateAdminCampaign,
 } from "@/lib/api/campaign"
 import type { Campaign } from "@/lib/campaign.types"
+import type { SearchIntent } from "@/lib/campaign.types"
 import { fetchPublishersForAssignment } from "@/lib/api/publisher-search"
 import { fetchRoiBenchmarks } from "@/lib/api/roi-benchmarks"
+import { SEARCH_INTENT_OPTIONS } from "@/lib/search-intent"
 import apiConfig from "@/lib/apiConfig"
 
 type BrandOption = { id: string; brand_name: string }
@@ -86,6 +90,13 @@ export function AdminCampaignWizard({ brief }: Props) {
     brief?.commerce_links.join("\n") ?? "",
   )
   const [contentType, setContentType] = useState("Editorial")
+  const [primaryKeywords, setPrimaryKeywords] = useState<string[]>(
+    brief?.primary_keywords ?? [],
+  )
+  const [secondaryKeywords, setSecondaryKeywords] = useState<string[]>(
+    brief?.secondary_keywords ?? [],
+  )
+  const [searchIntent, setSearchIntent] = useState(brief?.search_intent ?? "")
   const [contentBudget, setContentBudget] = useState(
     String(brief?.budget_min ? Math.floor(brief.budget_min * 0.6) : ""),
   )
@@ -164,6 +175,9 @@ export function AdminCampaignWizard({ brief }: Props) {
       start_date: startDate || undefined,
       end_date: endDate || undefined,
       publisher_ids: selectedPublishers,
+      primary_keywords: primaryKeywords,
+      secondary_keywords: secondaryKeywords,
+      search_intent: (searchIntent || undefined) as SearchIntent | undefined,
     }),
     [
       brandId,
@@ -178,6 +192,9 @@ export function AdminCampaignWizard({ brief }: Props) {
       startDate,
       endDate,
       selectedPublishers,
+      primaryKeywords,
+      secondaryKeywords,
+      searchIntent,
     ],
   )
 
@@ -198,6 +215,11 @@ export function AdminCampaignWizard({ brief }: Props) {
           start_date: payload.start_date,
           end_date: payload.end_date,
           publisher_ids: payload.publisher_ids,
+        })
+        await updateAdminCampaign(campaign.id, {
+          primary_keywords: payload.primary_keywords,
+          secondary_keywords: payload.secondary_keywords,
+          search_intent: payload.search_intent,
         })
       } else {
         campaign = await createAdminCampaign(payload)
@@ -442,6 +464,47 @@ export function AdminCampaignWizard({ brief }: Props) {
                 onChange={(e) => setContentType(e.target.value)}
                 className="h-10 rounded-xl border-border/80 bg-muted/20 shadow-none"
               />
+            </div>
+            <div className="rounded-xl border border-border/70 bg-muted/10 p-4 space-y-4">
+              <div>
+                <p className="text-sm font-medium">AEO optimization</p>
+                <p className="text-muted-foreground text-xs">
+                  Keywords and search intent for content planning.
+                </p>
+              </div>
+              <SkuTagInput
+                id="primary-keywords"
+                label="Primary keywords"
+                value={primaryKeywords}
+                onChange={setPrimaryKeywords}
+                placeholder="Type a keyword and press Enter"
+              />
+              <SkuTagInput
+                id="secondary-keywords"
+                label="Secondary keywords"
+                value={secondaryKeywords}
+                onChange={setSecondaryKeywords}
+                placeholder="Type a keyword and press Enter"
+              />
+              <div className="space-y-2">
+                <Label>Search intent</Label>
+                <Select
+                  value={searchIntent || "none"}
+                  onValueChange={(v) => setSearchIntent(v === "none" ? "" : v)}
+                >
+                  <SelectTrigger className="h-10 rounded-xl border-border/80 bg-muted/20 shadow-none">
+                    <SelectValue placeholder="Select intent (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Not specified</SelectItem>
+                    {SEARCH_INTENT_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </>

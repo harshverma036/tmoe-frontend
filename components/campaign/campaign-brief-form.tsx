@@ -14,6 +14,13 @@ import { SkuTagInput } from "@/components/campaign/sku-tag-input"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import {
   campaignQueryKey,
@@ -31,6 +38,7 @@ import {
   campaignBriefEmptyValues,
   type CampaignBriefFormValues,
 } from "@/lib/validation/campaign-brief-form"
+import { SEARCH_INTENT_OPTIONS } from "@/lib/search-intent"
 
 type CampaignBriefFormProps = {
   mode: "create" | "edit"
@@ -296,6 +304,72 @@ export function CampaignBriefForm({
             aria-invalid={errors.description ? true : undefined}
             {...register("description")}
             className="w-full min-w-0"
+          />
+        </div>
+
+        <div className="rounded-xl border border-border/80 bg-muted/20 p-4 space-y-4">
+          <div>
+            <p className="text-sm font-medium">AEO optimization</p>
+            <p className="text-muted-foreground text-xs">
+              Keywords and search intent for answer engine optimization.
+            </p>
+          </div>
+
+          <Controller
+            name="primary_keywords"
+            control={control}
+            render={({ field }) => (
+              <SkuTagInput
+                value={field.value}
+                onChange={field.onChange}
+                label="Primary keywords"
+                placeholder="Type a keyword and press Enter"
+                disabled={pending}
+              />
+            )}
+          />
+
+          <Controller
+            name="secondary_keywords"
+            control={control}
+            render={({ field }) => (
+              <SkuTagInput
+                value={field.value}
+                onChange={field.onChange}
+                label="Secondary keywords"
+                placeholder="Type a keyword and press Enter"
+                disabled={pending}
+              />
+            )}
+          />
+
+          <Controller
+            name="search_intent"
+            control={control}
+            render={({ field }) => (
+              <div className="grid gap-2">
+                <Label>Search intent</Label>
+                <Select
+                  value={field.value || "none"}
+                  onValueChange={(v) =>
+                    field.onChange(v === "none" ? "" : v)
+                  }
+                  disabled={pending}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select intent (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Not specified</SelectItem>
+                    {SEARCH_INTENT_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           />
         </div>
 

@@ -9,6 +9,33 @@ export type CampaignStatus =
   | "COMPLETED"
   | "CANCELLED"
 
+export type SearchIntent =
+  | "INFORMATIONAL"
+  | "COMMERCIAL"
+  | "TRANSACTIONAL"
+  | "NAVIGATIONAL"
+
+export type CampaignApplicationStatus = "PENDING" | "APPROVED" | "REJECTED"
+
+export type CampaignApplication = {
+  id: string
+  campaign_id?: string
+  publisher_profile_id?: string
+  status: CampaignApplicationStatus
+  note?: string | null
+  rejection_note?: string | null
+  reviewed_at?: string | null
+  created_at?: string | null
+  publisher_profile?: {
+    id: string
+    publication_name?: string | null
+    content_categories?: string[]
+    monthly_sessions?: number | null
+    user?: { id: string; name?: string | null; email: string }
+  }
+  reviewed_by?: { id: string; name?: string | null; email: string } | null
+}
+
 export type CampaignPublisherAssignment = {
   id: string
   publisher_profile_id: string
@@ -71,6 +98,9 @@ export type Campaign = {
   est_orders?: number | null
   est_gmv?: number | null
   est_roi?: number | null
+  primary_keywords?: string[]
+  secondary_keywords?: string[]
+  search_intent?: SearchIntent | null
   brand_profile?: CampaignBrandProfile | null
   publishers?: CampaignPublisherAssignment[]
   created_at?: string | null
@@ -96,6 +126,27 @@ export type CreateCampaignBody = {
   roi_target?: number
   submit_for_review?: boolean
   description?: string
+  primary_keywords?: string[]
+  secondary_keywords?: string[]
+  search_intent?: SearchIntent
+}
+
+export type MarketplaceCampaign = Campaign & {
+  my_application?: CampaignApplication | null
+}
+
+export type MarketplaceListResult = {
+  items: MarketplaceCampaign[]
+  total: number
+  page?: number
+  pageSize?: number
+}
+
+export type CampaignApplicationListResult = {
+  items: CampaignApplication[]
+  total: number
+  page?: number
+  pageSize?: number
 }
 
 export type UpdateCampaignBody = Partial<CreateCampaignBody>
@@ -113,6 +164,9 @@ export type CreateAdminCampaignBody = {
   start_date?: string
   end_date?: string
   publisher_ids?: string[]
+  primary_keywords?: string[]
+  secondary_keywords?: string[]
+  search_intent?: SearchIntent
 }
 
 export type ConvertFromBriefBody = {
