@@ -25,6 +25,7 @@ export function campaignToFormValues(c: Campaign): CampaignBriefFormValues {
       ? [...c.secondary_keywords]
       : [],
     search_intent: c.search_intent ?? "",
+    content_placement_id: c.content_placement_id ?? "",
   }
 }
 
@@ -59,6 +60,8 @@ export function formValuesToCreateBody(
   }
   const intent = v.search_intent?.trim()
   if (intent) body.search_intent = intent as CreateCampaignBody["search_intent"]
+  const placementId = v.content_placement_id?.trim()
+  if (placementId) body.content_placement_id = placementId
   return body
 }
 
@@ -77,6 +80,7 @@ const FORM_KEYS: (keyof CampaignBriefFormValues)[] = [
   "primary_keywords",
   "secondary_keywords",
   "search_intent",
+  "content_placement_id",
 ]
 
 export function buildCampaignUpdateBody(
@@ -94,6 +98,11 @@ export function buildCampaignUpdateBody(
       if (key === "search_intent") {
         const intent = String(val ?? "").trim()
         ;(patch as Record<string, unknown>)[key] = intent || null
+        continue
+      }
+      if (key === "content_placement_id") {
+        const placementId = String(val ?? "").trim()
+        ;(patch as Record<string, unknown>)[key] = placementId || null
         continue
       }
       ;(patch as Record<string, unknown>)[key] = val

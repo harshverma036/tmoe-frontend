@@ -1,4 +1,5 @@
 import apiConfig from "@/lib/apiConfig"
+import { normalizeContentPlacement } from "@/lib/api/content-placements"
 import type {
   Campaign,
   CampaignApplication,
@@ -186,6 +187,10 @@ export function normalizeCampaign(row: Record<string, unknown>): Campaign {
     | Record<string, unknown>
     | undefined
 
+  const placementRaw = readProp(row, "content_placement", "contentPlacement") as
+    | Record<string, unknown>
+    | undefined
+
   return {
     id,
     name: String(readProp(row, "name", "name") ?? ""),
@@ -227,6 +232,12 @@ export function normalizeCampaign(row: Record<string, unknown>): Campaign {
       if (!v) return null
       return String(v).toUpperCase() as Campaign["search_intent"]
     })(),
+    content_placement_id:
+      (readProp(row, "content_placement_id", "contentPlacementId") as string) ??
+      null,
+    content_placement: placementRaw
+      ? normalizeContentPlacement(placementRaw)
+      : null,
     brand_profile: brandRaw
       ? {
           id: String(brandRaw.id ?? ""),

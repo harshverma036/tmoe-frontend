@@ -18,6 +18,7 @@ import {
 import toast from "react-hot-toast"
 
 import { CampaignBriefForm } from "@/components/campaign/campaign-brief-form"
+import { CampaignContentPlacementSection } from "@/components/campaign/campaign-content-placement-section"
 import { CampaignDeliverablesSection } from "@/components/campaign/campaign-deliverables-section"
 import { CampaignPerformancePanel } from "@/components/campaign/campaign-performance-panel"
 import { RoiEstimatorWidget } from "@/components/campaign/roi-estimator-widget"
@@ -142,7 +143,7 @@ export function CampaignDetailClient({ id }: { id: string }) {
   const [statusChoice, setStatusChoice] = useState<CampaignStatus | null>(null)
   const [statusNote, setStatusNote] = useState("")
   const [detailTab, setDetailTab] = useState<
-    "overview" | "performance" | "content" | "applications"
+    "overview" | "performance" | "content" | "content_placement" | "applications"
   >("overview")
   const [publisherSearch, setPublisherSearch] = useState("")
   const [pickPublishers, setPickPublishers] = useState<string[]>([])
@@ -529,6 +530,7 @@ export function CampaignDetailClient({ id }: { id: string }) {
                   : []),
                 { id: "performance" as const, label: "Performance" },
                 { id: "content" as const, label: "Content" },
+                { id: "content_placement" as const, label: "Content Placement" },
               ] as const
             ).map((tab) => (
               <Button
@@ -556,6 +558,12 @@ export function CampaignDetailClient({ id }: { id: string }) {
               campaignId={id}
               campaign={campaign}
               role={role}
+            />
+          ) : null}
+
+          {detailTab === "content_placement" ? (
+            <CampaignContentPlacementSection
+              placement={campaign.content_placement}
             />
           ) : null}
 
@@ -743,6 +751,8 @@ export function CampaignDetailClient({ id }: { id: string }) {
         </>
       ) : null}
 
+      {!isOperational || detailTab === "overview" ? (
+        <>
       <div className="grid gap-4 sm:grid-cols-2">
         <DetailBlock label="Target categories">
           <ul className="list-inside list-disc space-y-1">
@@ -796,8 +806,15 @@ export function CampaignDetailClient({ id }: { id: string }) {
           ))}
         </ul>
       </DetailBlock>
+        </>
+      ) : null}
 
-      {!isOperational ? <CampaignAeoSection campaign={campaign} /> : null}
+      {!isOperational ? (
+        <>
+          <CampaignContentPlacementSection placement={campaign.content_placement} />
+          <CampaignAeoSection campaign={campaign} />
+        </>
+      ) : null}
 
       <Separator />
 

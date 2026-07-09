@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   LayoutDashboard,
+  LayoutGrid,
   LineChart,
   Link2,
   Megaphone,
@@ -41,6 +42,12 @@ export const dashboardNavItems: DashboardNavItem[] = [
     label: "Users",
     href: "/users",
     icon: Users,
+    allowed_roles: [UserRole.ADMIN],
+  },
+  {
+    label: "Content Placement",
+    href: "/content-placements",
+    icon: LayoutGrid,
     allowed_roles: [UserRole.ADMIN],
   },
   {

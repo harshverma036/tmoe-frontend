@@ -8,6 +8,7 @@ import { ArrowRight, Loader2 } from "lucide-react"
 import toast from "react-hot-toast"
 
 import { PublisherMultiSelect } from "@/components/campaign/publisher-multi-select"
+import { ContentPlacementSelectField } from "@/components/content-placement/content-placement-select-field"
 import { SkuTagInput } from "@/components/campaign/sku-tag-input"
 import { RoiEstimatorWidget } from "@/components/campaign/roi-estimator-widget"
 import {
@@ -90,6 +91,9 @@ export function AdminCampaignWizard({ brief }: Props) {
     brief?.commerce_links.join("\n") ?? "",
   )
   const [contentType, setContentType] = useState("Editorial")
+  const [contentPlacementId, setContentPlacementId] = useState(
+    brief?.content_placement_id ?? "",
+  )
   const [primaryKeywords, setPrimaryKeywords] = useState<string[]>(
     brief?.primary_keywords ?? [],
   )
@@ -178,6 +182,7 @@ export function AdminCampaignWizard({ brief }: Props) {
       primary_keywords: primaryKeywords,
       secondary_keywords: secondaryKeywords,
       search_intent: (searchIntent || undefined) as SearchIntent | undefined,
+      content_placement_id: contentPlacementId || undefined,
     }),
     [
       brandId,
@@ -195,6 +200,7 @@ export function AdminCampaignWizard({ brief }: Props) {
       primaryKeywords,
       secondaryKeywords,
       searchIntent,
+      contentPlacementId,
     ],
   )
 
@@ -215,11 +221,15 @@ export function AdminCampaignWizard({ brief }: Props) {
           start_date: payload.start_date,
           end_date: payload.end_date,
           publisher_ids: payload.publisher_ids,
+          content_placement_id: payload.content_placement_id,
         })
         await updateAdminCampaign(campaign.id, {
           primary_keywords: payload.primary_keywords,
           secondary_keywords: payload.secondary_keywords,
           search_intent: payload.search_intent,
+          ...(payload.content_placement_id
+            ? { content_placement_id: payload.content_placement_id }
+            : {}),
         })
       } else {
         campaign = await createAdminCampaign(payload)
@@ -465,6 +475,10 @@ export function AdminCampaignWizard({ brief }: Props) {
                 className="h-10 rounded-xl border-border/80 bg-muted/20 shadow-none"
               />
             </div>
+            <ContentPlacementSelectField
+              value={contentPlacementId}
+              onChange={setContentPlacementId}
+            />
             <div className="rounded-xl border border-border/70 bg-muted/10 p-4 space-y-4">
               <div>
                 <p className="text-sm font-medium">AEO optimization</p>

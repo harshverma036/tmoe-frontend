@@ -1,6 +1,7 @@
+import type { ContentPlacement } from "@/lib/content-placement.types"
+
 /** Brief + operational campaign statuses (Prisma `CAMPAIGN_STATUS`). */
-export type CampaignStatus =
-  | "DRAFT"
+export type CampaignStatus =  | "DRAFT"
   | "UNDER_REVIEW"
   | "APPROVED"
   | "REJECTED"
@@ -101,6 +102,8 @@ export type Campaign = {
   primary_keywords?: string[]
   secondary_keywords?: string[]
   search_intent?: SearchIntent | null
+  content_placement_id?: string | null
+  content_placement?: ContentPlacement | null
   brand_profile?: CampaignBrandProfile | null
   publishers?: CampaignPublisherAssignment[]
   created_at?: string | null
@@ -129,6 +132,7 @@ export type CreateCampaignBody = {
   primary_keywords?: string[]
   secondary_keywords?: string[]
   search_intent?: SearchIntent
+  content_placement_id?: string
 }
 
 export type MarketplaceCampaign = Campaign & {
@@ -167,6 +171,7 @@ export type CreateAdminCampaignBody = {
   primary_keywords?: string[]
   secondary_keywords?: string[]
   search_intent?: SearchIntent
+  content_placement_id?: string
 }
 
 export type ConvertFromBriefBody = {
@@ -176,6 +181,7 @@ export type ConvertFromBriefBody = {
   start_date?: string
   end_date?: string
   publisher_ids?: string[]
+  content_placement_id?: string
 }
 
 export type EstimateCampaignBody = {
