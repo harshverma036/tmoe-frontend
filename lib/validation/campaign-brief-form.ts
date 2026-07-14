@@ -52,6 +52,10 @@ export type CampaignBriefFormValues = {
   commerce_links: string[]
   submit_for_review: boolean
   description: string
+  primary_keywords: string[]
+  secondary_keywords: string[]
+  search_intent?: string
+  content_placement_id: string
 }
 
 export const campaignBriefEmptyValues: CampaignBriefFormValues = {
@@ -66,6 +70,10 @@ export const campaignBriefEmptyValues: CampaignBriefFormValues = {
   commerce_links: [""],
   submit_for_review: false,
   description: "",
+  primary_keywords: [],
+  secondary_keywords: [],
+  search_intent: "",
+  content_placement_id: "",
 }
 
 /** Create flow — matches POST `/api/campaign` contract. */
@@ -99,23 +107,27 @@ export const campaignBriefCreateSchema = yup
     commerce_links: urlList,
     submit_for_review: yup.boolean().default(false),
     description: yup.string().trim().optional().default(""),
+    primary_keywords: yup.array().of(yup.string().trim()).default([]),
+    secondary_keywords: yup.array().of(yup.string().trim()).default([]),
+    search_intent: yup.string().trim().optional().default(""),
+    content_placement_id: yup.string().trim().optional().default(""),
   })
-  .test(
-    "budget-range",
-    "Maximum budget must be greater than or equal to minimum budget",
-    (vals) => {
-      if (vals?.budget_min == null || vals?.budget_max == null) return true
-      return vals.budget_max >= vals.budget_min
-    },
-  )
-  .test(
-    "gmv-or-roi",
-    "Provide a GMV target and/or an ROI target",
-    (vals) => {
-      const g = vals?.gmv_target
-      const r = vals?.roi_target
-      const hasG = g !== undefined && g !== null && !Number.isNaN(g)
-      const hasR = r !== undefined && r !== null && !Number.isNaN(r)
-      return hasG || hasR
-    },
-  )
+  .test("budget-range", function (vals) {
+    if (vals?.budget_min == null || vals?.budget_max == null) return true
+    if (vals.budget_max >= vals.budget_min) return true
+    return this.createError({
+      path: "budget_max",
+      message: "Maximum budget must be greater than or equal to minimum budget",
+    })
+  })
+  .test("gmv-or-roi", function (vals) {
+    const g = vals?.gmv_target
+    const r = vals?.roi_target
+    const hasG = g !== undefined && g !== null && !Number.isNaN(g)
+    const hasR = r !== undefined && r !== null && !Number.isNaN(r)
+    if (hasG || hasR) return true
+    return this.createError({
+      path: "gmv_target",
+      message: "Provide a GMV target and/or an ROI target",
+    })
+  })

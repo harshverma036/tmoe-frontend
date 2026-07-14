@@ -18,6 +18,7 @@ import {
 import toast from "react-hot-toast"
 
 import { CampaignBriefForm } from "@/components/campaign/campaign-brief-form"
+import { CampaignContentPlacementSection } from "@/components/campaign/campaign-content-placement-section"
 import { CampaignDeliverablesSection } from "@/components/campaign/campaign-deliverables-section"
 import { CampaignPerformancePanel } from "@/components/campaign/campaign-performance-panel"
 import { RoiEstimatorWidget } from "@/components/campaign/roi-estimator-widget"
@@ -62,6 +63,8 @@ import { UserRole } from "@/lib/dashboard-nav"
 import { useDashboardUserRole } from "@/lib/hooks/use-dashboard-user-role"
 import { cn } from "@/lib/utils"
 import { PublisherMultiSelect } from "@/components/campaign/publisher-multi-select"
+import { CampaignApplicationsPanel } from "@/components/campaign/campaign-applications-panel"
+import { CampaignAeoSection } from "@/components/campaign/campaign-aeo-section"
 import { fetchPublishersForAssignment } from "@/lib/api/publisher-search"
 import { getUserIdFromCookie } from "@/lib/user-info-cookie"
 import type { CampaignPublisherAssignment } from "@/lib/campaign.types"
@@ -112,14 +115,16 @@ function DetailBlock({
   return (
     <div
       className={cn(
-        "animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both duration-500 rounded-xl border border-border/80 bg-card/80 p-4 shadow-sm backdrop-blur-sm",
+        "animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both min-w-0 duration-500 overflow-hidden rounded-xl border border-border/80 bg-card/80 p-4 shadow-sm backdrop-blur-sm",
         delayClass,
       )}
     >
       <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
         {label}
       </p>
-      <div className="mt-2 text-sm leading-relaxed">{children}</div>
+      <div className="mt-2 min-w-0 text-sm leading-relaxed wrap-break-word">
+        {children}
+      </div>
     </div>
   )
 }
@@ -137,9 +142,9 @@ export function CampaignDetailClient({ id }: { id: string }) {
   )
   const [statusChoice, setStatusChoice] = useState<CampaignStatus | null>(null)
   const [statusNote, setStatusNote] = useState("")
-  const [detailTab, setDetailTab] = useState<"overview" | "performance" | "content">(
-    "overview",
-  )
+  const [detailTab, setDetailTab] = useState<
+    "overview" | "performance" | "content" | "content_placement" | "applications"
+  >("overview")
   const [publisherSearch, setPublisherSearch] = useState("")
   const [pickPublishers, setPickPublishers] = useState<string[]>([])
   const [declineOpen, setDeclineOpen] = useState(false)
@@ -325,6 +330,12 @@ export function CampaignDetailClient({ id }: { id: string }) {
     role === UserRole.ADMIN &&
     isBrief &&
     campaign.status === "APPROVED"
+
+  const showApplicationsTab =
+    role === UserRole.ADMIN &&
+    isOperational &&
+    campaign.status === "ACTIVE" &&
+    !(campaign.publishers && campaign.publishers.length > 0)
 
   const adminStatusActions: { status: CampaignStatus; label: string }[] = []
   if (role === UserRole.ADMIN && isOperational) {
@@ -514,8 +525,12 @@ export function CampaignDetailClient({ id }: { id: string }) {
             {(
               [
                 { id: "overview" as const, label: "Overview" },
+                ...(showApplicationsTab
+                  ? [{ id: "applications" as const, label: "Applications" }]
+                  : []),
                 { id: "performance" as const, label: "Performance" },
                 { id: "content" as const, label: "Content" },
+                { id: "content_placement" as const, label: "Content Placement" },
               ] as const
             ).map((tab) => (
               <Button
@@ -534,11 +549,21 @@ export function CampaignDetailClient({ id }: { id: string }) {
             <CampaignPerformancePanel campaign={campaign} />
           ) : null}
 
+          {detailTab === "applications" && showApplicationsTab ? (
+            <CampaignApplicationsPanel campaignId={id} />
+          ) : null}
+
           {detailTab === "content" ? (
             <CampaignDeliverablesSection
               campaignId={id}
               campaign={campaign}
               role={role}
+            />
+          ) : null}
+
+          {detailTab === "content_placement" ? (
+            <CampaignContentPlacementSection
+              placement={campaign.content_placement}
             />
           ) : null}
 
@@ -581,6 +606,8 @@ export function CampaignDetailClient({ id }: { id: string }) {
               {campaign.content_type ?? "—"}
             </DetailBlock>
           </div>
+
+          <CampaignAeoSection campaign={campaign} />
 
           {(campaign.est_gmv != null || role === UserRole.ADMIN) && (
             <Card>
@@ -724,6 +751,8 @@ export function CampaignDetailClient({ id }: { id: string }) {
         </>
       ) : null}
 
+      {!isOperational || detailTab === "overview" ? (
+        <>
       <div className="grid gap-4 sm:grid-cols-2">
         <DetailBlock label="Target categories">
           <ul className="list-inside list-disc space-y-1">
@@ -735,7 +764,9 @@ export function CampaignDetailClient({ id }: { id: string }) {
         <DetailBlock label="Product SKUs">
           <ul className="list-inside list-disc space-y-1">
             {campaign.product_skus.map((s) => (
-              <li key={s}>{s}</li>
+              <li key={s} className="wrap-break-word">
+                {s}
+              </li>
             ))}
           </ul>
         </DetailBlock>
@@ -762,12 +793,12 @@ export function CampaignDetailClient({ id }: { id: string }) {
       <DetailBlock label="Commerce links">
         <ul className="space-y-2">
           {campaign.commerce_links.map((href) => (
-            <li key={href}>
+            <li key={href} className="min-w-0">
               <a
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-primary font-medium underline-offset-4 hover:underline"
+                className="text-primary block max-w-full font-medium wrap-anywhere underline-offset-4 hover:underline"
               >
                 {href}
               </a>
@@ -775,6 +806,15 @@ export function CampaignDetailClient({ id }: { id: string }) {
           ))}
         </ul>
       </DetailBlock>
+        </>
+      ) : null}
+
+      {!isOperational ? (
+        <>
+          <CampaignContentPlacementSection placement={campaign.content_placement} />
+          <CampaignAeoSection campaign={campaign} />
+        </>
+      ) : null}
 
       <Separator />
 
