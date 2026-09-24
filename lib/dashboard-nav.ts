@@ -1,5 +1,7 @@
 import {
   CalendarDays,
+  FileChartColumn,
+  FileSpreadsheet,
   LayoutDashboard,
   LayoutGrid,
   LineChart,
@@ -78,6 +80,18 @@ export const dashboardNavItems: DashboardNavItem[] = [
     label: "ROI Benchmarks",
     href: "/roi-benchmarks",
     icon: LineChart,
+    allowed_roles: [UserRole.ADMIN],
+  },
+  {
+    label: "Reports",
+    href: "/reports",
+    icon: FileChartColumn,
+    allowed_roles: [UserRole.ADMIN],
+  },
+  {
+    label: "Report Sources",
+    href: "/report-sources",
+    icon: FileSpreadsheet,
     allowed_roles: [UserRole.ADMIN],
   },
   {

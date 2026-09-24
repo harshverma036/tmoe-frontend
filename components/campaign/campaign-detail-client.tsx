@@ -563,7 +563,9 @@ export function CampaignDetailClient({ id }: { id: string }) {
 
           {detailTab === "content_placement" ? (
             <CampaignContentPlacementSection
+              campaignId={id}
               placement={campaign.content_placement}
+              role={role}
             />
           ) : null}
 
@@ -811,7 +813,11 @@ export function CampaignDetailClient({ id }: { id: string }) {
 
       {!isOperational ? (
         <>
-          <CampaignContentPlacementSection placement={campaign.content_placement} />
+          <CampaignContentPlacementSection
+            campaignId={id}
+            placement={campaign.content_placement}
+            role={role}
+          />
           <CampaignAeoSection campaign={campaign} />
         </>
       ) : null}
