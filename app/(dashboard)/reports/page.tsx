@@ -10,6 +10,7 @@ import { RefreshCw } from "lucide-react"
 import { FilterTabs } from "@/components/common/FilterTabs"
 import { StatusBadge } from "@/components/common/StatusBadge"
 import { PageHeader } from "@/components/layout/page-header"
+import { ImpactProgramReport } from "@/components/reports/impact-program-report"
 import { ReportRangeFilter } from "@/components/reports/report-range-filter"
 import {
   formatReportValue,
@@ -33,6 +34,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  fetchImpactPerformance,
+  impactPerformanceQueryKey,
+} from "@/lib/api/insights"
 import {
   fetchReportInsightBrands,
   fetchReportInsights,
@@ -289,6 +294,25 @@ export default function ReportsPage() {
     staleTime: 0,
   })
 
+  // A brand linked to an Impact.com program (Promote Links → Brand Impact config) also gets
+  // that program's figures, read live from Impact for the same dates.
+  const selectedBrand = brands.find((brand) => brand.id === brandId)
+  const impactProgramId = selectedBrand?.impact_program_id ?? null
+  const impactQuery = useQuery({
+    queryKey: [
+      ...impactPerformanceQueryKey,
+      impactProgramId,
+      range.start_date,
+      range.end_date,
+    ],
+    queryFn: () =>
+      fetchImpactPerformance({
+        program_id: impactProgramId ?? undefined,
+        ...range,
+      }),
+    enabled: isAdmin && impactProgramId !== null,
+  })
+
   if (!isReady) {
     return <LoadingSkeleton className="h-48 w-full" />
   }
@@ -306,6 +330,37 @@ export default function ReportsPage() {
 
   const brandsLoading = brandsQuery.isFetching && brands.length === 0
   const insights = reportQuery.data
+  const impact = impactQuery.data
+
+  let impactSection: React.ReactNode = null
+  if (impactProgramId === null) {
+    impactSection = null
+  } else if (impactQuery.isError) {
+    impactSection = (
+      <ErrorCard
+        title="Could not load Impact.com performance"
+        message={apiMessage(impactQuery.error, "Impact.com API request failed.")}
+        onRetry={() => impactQuery.refetch()}
+      />
+    )
+  } else if (!impact) {
+    impactSection = <LoadingSkeleton className="h-64 w-full" />
+  } else {
+    impactSection = (
+      <ImpactProgramReport
+        // A new range or brand remounts the table, which puts it back on page 1.
+        key={`${impactProgramId}-${impact.start_date}-${impact.end_date}`}
+        programId={impactProgramId}
+        programName={selectedBrand?.impact_program_name ?? null}
+        data={impact}
+        rangeLabel={formatRange({
+          start_date: impact.start_date,
+          end_date: impact.end_date,
+        })}
+        isFetching={impactQuery.isFetching}
+      />
+    )
+  }
 
   let body: React.ReactNode
   // A failed refetch keeps the cached list, which is still fine to pick from.
@@ -324,7 +379,8 @@ export default function ReportsPage() {
           <CardTitle>No reports yet</CardTitle>
           <CardDescription>
             A brand appears here once one of its sheets has a sheet type, which
-            decides how its report is worked out. Sheet types are set through the
+            decides how its report is worked out, or once it is linked to an
+            Impact.com program on Promote Links. Sheet types are set through the
             API for now (PATCH /api/report-sources/:id with sheet_type).
           </CardDescription>
           <Button asChild variant="outline" className="mt-2 w-fit">
@@ -348,14 +404,25 @@ export default function ReportsPage() {
     )
   } else if (reportQuery.isError) {
     body = (
-      <ErrorCard
-        title="Could not load the report"
-        message={apiMessage(reportQuery.error, "Check your connection and try again.")}
-        onRetry={() => reportQuery.refetch()}
-      />
+      <>
+        {impactSection}
+        <ErrorCard
+          title="Could not load the report"
+          message={apiMessage(reportQuery.error, "Check your connection and try again.")}
+          onRetry={() => reportQuery.refetch()}
+        />
+      </>
     )
   } else if (!insights) {
-    body = <LoadingSkeleton className="h-64 w-full" />
+    body = impactSection ?? <LoadingSkeleton className="h-64 w-full" />
+  } else if (insights.reports.length === 0 && impactSection !== null) {
+    // The Impact.com report is this brand's report; any sheets it has are listed below it.
+    body = (
+      <>
+        {impactSection}
+        <UntypedSheets sheets={insights.sheets_without_type} />
+      </>
+    )
   } else if (insights.reports.length === 0) {
     body = (
       <Card>
@@ -376,6 +443,7 @@ export default function ReportsPage() {
   } else {
     body = (
       <>
+        {impactSection}
         {insights.reports.map((report) => (
           <SheetReport
             key={report.report_source_id}
@@ -437,11 +505,18 @@ export default function ReportsPage() {
               variant="outline"
               className="gap-2"
               title="Reloads the report. To re-read the Google Sheet, use Sync now on its Report Sources page."
-              onClick={() => reportQuery.refetch()}
-              disabled={brandId === "" || reportQuery.isFetching}
+              onClick={() => {
+                reportQuery.refetch()
+                if (impactProgramId !== null) impactQuery.refetch()
+              }}
+              disabled={
+                brandId === "" || reportQuery.isFetching || impactQuery.isFetching
+              }
             >
               <RefreshCw
-                className={`size-4 ${reportQuery.isFetching ? "animate-spin" : ""}`}
+                className={`size-4 ${
+                  reportQuery.isFetching || impactQuery.isFetching ? "animate-spin" : ""
+                }`}
               />
               Refresh
             </Button>

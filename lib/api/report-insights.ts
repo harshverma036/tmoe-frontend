@@ -89,14 +89,26 @@ function normalizeReport(report: Row): SheetReportInsight {
   }
 }
 
-/** Brands with at least one sheet that has a report. */
-export async function fetchReportInsightBrands(): Promise<ReportSourceBrand[]> {
+/** A brand on the Reports page; `impact_program_id` is set when it has an Impact.com report. */
+export type ReportInsightBrand = ReportSourceBrand & {
+  impact_program_id: string | null
+  impact_program_name: string | null
+}
+
+function optionalString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() !== "" ? value : null
+}
+
+/** Brands with at least one sheet that has a report, or a linked Impact.com program. */
+export async function fetchReportInsightBrands(): Promise<ReportInsightBrand[]> {
   const response = await apiConfig.get("/api/report-insights/brands")
   const rows: unknown = response.data?.data
   if (!Array.isArray(rows)) return []
   return rows.map((row: Record<string, unknown>) => ({
     id: String(row.id ?? ""),
     brand_name: String(row.brand_name ?? ""),
+    impact_program_id: optionalString(row.impact_program_id),
+    impact_program_name: optionalString(row.impact_program_name),
   }))
 }
 

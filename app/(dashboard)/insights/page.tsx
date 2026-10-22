@@ -18,33 +18,20 @@ import {
   fetchImpactPerformance,
   impactPerformanceQueryKey,
   type ImpactBrandPerformanceRow,
-  type ImpactDayPerformanceRow,
 } from "@/lib/api/insights"
 import { UserRole } from "@/lib/dashboard-nav"
 import { useDashboardUserRole } from "@/lib/hooks/use-dashboard-user-role"
+import {
+  formatImpactInt as formatInt,
+  formatImpactMoney as formatMoney,
+  formatImpactPct as formatPct,
+  formatImpactRate as formatRate,
+  IMPACT_DAY_COLUMNS,
+  toImpactDayDisplay as toDayDisplay,
+} from "@/lib/impact-performance-format"
 
 function toInputDate(d: Date) {
   return format(d, "yyyy-MM-dd")
-}
-
-function formatInt(n: number) {
-  return new Intl.NumberFormat("en-US").format(Math.round(n))
-}
-
-function formatMoney(n: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(n)
-}
-
-function formatPct(rate: number) {
-  return `${(rate * 100).toFixed(2)}%`
-}
-
-function formatRate(n: number) {
-  return n.toFixed(4)
 }
 
 type BrandDisplayRow = {
@@ -61,39 +48,11 @@ type BrandDisplayRow = {
   aov: string
 }
 
-type DayDisplayRow = {
-  id: string
-  date_display: string
-  clicks: string
-  actions: string
-  sale_amount: string
-  total_earnings: string
-  epa: string
-  epc: string
-  conversion_rate: string
-  aov: string
-}
-
 function toBrandDisplay(row: ImpactBrandPerformanceRow): BrandDisplayRow {
   return {
     id: row.program_id || row.program,
     program: row.program,
     program_id: row.program_id,
-    clicks: formatInt(row.clicks),
-    actions: formatInt(row.actions),
-    sale_amount: formatMoney(row.sale_amount),
-    total_earnings: formatMoney(row.total_earnings),
-    epa: formatRate(row.epa),
-    epc: formatRate(row.epc),
-    conversion_rate: formatPct(row.conversion_rate),
-    aov: formatMoney(row.aov),
-  }
-}
-
-function toDayDisplay(row: ImpactDayPerformanceRow): DayDisplayRow {
-  return {
-    id: row.date || row.date_display,
-    date_display: row.date_display,
     clicks: formatInt(row.clicks),
     actions: formatInt(row.actions),
     sale_amount: formatMoney(row.sale_amount),
@@ -347,17 +306,7 @@ export default function InsightsPage() {
               dayTable.resetToFirstPage()
             }}
             isFetching={isFetching}
-            columns={[
-              { accessorKey: "date_display", header: "Date" },
-              { accessorKey: "clicks", header: "Clicks" },
-              { accessorKey: "actions", header: "Actions" },
-              { accessorKey: "sale_amount", header: "Sale amount" },
-              { accessorKey: "total_earnings", header: "Total earnings" },
-              { accessorKey: "epa", header: "EPA" },
-              { accessorKey: "epc", header: "EPC" },
-              { accessorKey: "conversion_rate", header: "CR" },
-              { accessorKey: "aov", header: "AOV" },
-            ]}
+            columns={IMPACT_DAY_COLUMNS}
           />
         </>
       )}
