@@ -80,6 +80,7 @@ export function normalizeReportSource(row: Row): ReportSource {
     columns: normalizeColumns(row.columns),
     all_tabs: row.all_tabs === true,
     tabs: normalizeTabs(row.tabs),
+    reads_whole_tab: row.reads_whole_tab === true,
     sync_enabled: row.sync_enabled !== false,
     last_synced_at: nullableStr(row.last_synced_at),
     last_sync_status: (row.last_sync_status ?? null) as ReportSyncStatus | null,

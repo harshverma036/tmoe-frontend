@@ -215,6 +215,7 @@ function SheetReport({
           }))}
           value={selectedTable.key}
           onChange={onSelectTable}
+          label="Report"
         />
       ) : null}
 

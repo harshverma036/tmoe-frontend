@@ -13,6 +13,10 @@ type FilterTabsProps<T extends string> = {
   value: T
   onChange: (value: T) => void
   className?: string
+  /** Names the strip for screen readers (e.g. "Report"). */
+  label?: string
+  /** The id of a visible element that names the strip; used instead of `label`. */
+  labelledBy?: string
 }
 
 function formatCount(value: number) {
@@ -24,15 +28,24 @@ export function FilterTabs<T extends string>({
   value,
   onChange,
   className,
+  label,
+  labelledBy,
 }: FilterTabsProps<T>) {
+  const isLabelled = label !== undefined || labelledBy !== undefined
   return (
-    <div className={cn("flex flex-wrap items-center gap-1", className)}>
+    <div
+      className={cn("flex flex-wrap items-center gap-1", className)}
+      role={isLabelled ? "group" : undefined}
+      aria-label={labelledBy === undefined ? label : undefined}
+      aria-labelledby={labelledBy}
+    >
       {tabs.map((tab) => {
         const isActive = value === tab.value
         return (
           <button
             key={tab.value}
             type="button"
+            aria-pressed={isActive}
             onClick={() => onChange(tab.value)}
             className={cn(
               "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors",

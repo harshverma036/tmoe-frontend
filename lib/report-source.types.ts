@@ -39,6 +39,8 @@ export type ReportSource = {
   all_tabs: boolean
   /** All-tabs sources only, in the spreadsheet's tab order; null for a single-tab source. */
   tabs: ReportSourceTab[] | null
+  /** true = its sheet type reads whole tabs, so every tab is imported from its first row. */
+  reads_whole_tab: boolean
   sync_enabled: boolean
   last_synced_at: string | null
   last_sync_status: ReportSyncStatus | null

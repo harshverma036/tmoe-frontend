@@ -156,6 +156,14 @@ export default function ReportSourceDetailPage() {
     keepPreviousData: true,
   })
 
+  // keepPreviousData keeps the last page on screen while the next one loads. That suits a page
+  // change, but after a switch to a tab not loaded yet those rows are the previous tab's, so the
+  // table shows its loading row instead. Only an all-tabs sheet names its tab: a single-tab sheet
+  // asks with "" and the API answers with the sheet's own gid.
+  const rowsFromOtherTab =
+    rowsGidParam !== "" && rowsResult !== undefined && rowsResult.gid !== rowsGidParam
+  const shownRows = rowsFromOtherTab ? undefined : rowsResult
+
   const runsPage = runsTable.pagination.pageIndex + 1
   const runsPageSize = runsTable.pagination.pageSize
   const { data: runsResult, isFetching: runsFetching } = useQuery({
@@ -237,9 +245,9 @@ export default function ReportSourceDetailPage() {
     onError: (error) => toast.error(apiMessage(error, "Could not remove sheet")),
   })
 
-  // The columns travel with the rows, so while another tab loads the table still matches the rows
-  // it shows. Before the first page arrives, the tab's (or the sheet's) columns stand in.
-  const rowsColumns = rowsResult?.columns ?? selectedTab?.columns ?? source?.columns
+  // The columns travel with the rows, so while another page loads the table still matches the rows
+  // it shows. Before a tab's first page arrives, the tab's (or the sheet's) columns stand in.
+  const rowsColumns = shownRows?.columns ?? selectedTab?.columns ?? source?.columns
 
   /** Row columns are built from whatever the last import found in the tab shown. */
   const rowColumns = useMemo(() => {
@@ -367,7 +375,7 @@ export default function ReportSourceDetailPage() {
   }
 
   const badge = reportSyncBadge(source.last_sync_status)
-  const rows = rowsResult?.data ?? []
+  const rows = shownRows?.data ?? []
   const runs = runsResult?.data ?? []
   const headerRowValue =
     headerRowDraft ?? (source.header_row === null ? "" : String(source.header_row))
@@ -501,9 +509,11 @@ export default function ReportSourceDetailPage() {
             )}
           </SummaryItem>
           <SummaryItem label="Header row">
-            {source.header_row === null
-              ? "Detected automatically"
-              : `Row ${source.header_row}`}
+            {source.reads_whole_tab
+              ? "First row of each tab"
+              : source.header_row === null
+                ? "Detected automatically"
+                : `Row ${source.header_row}`}
           </SummaryItem>
           <SummaryItem label="Added">
             {formatDateTime(source.created_at)}
@@ -522,7 +532,9 @@ export default function ReportSourceDetailPage() {
 
       {tab === "rows" && sheetTabs.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted-foreground">Sheet tab</span>
+          <span id="sheet-tab-label" className="text-xs text-muted-foreground">
+            Sheet tab
+          </span>
           <FilterTabs
             tabs={sheetTabs.map((sheetTab) => ({
               value: sheetTab.gid,
@@ -534,6 +546,7 @@ export default function ReportSourceDetailPage() {
               setRowsGid(gid)
               rowsTable.resetToFirstPage()
             }}
+            labelledBy="sheet-tab-label"
           />
         </div>
       ) : null}
@@ -570,7 +583,7 @@ export default function ReportSourceDetailPage() {
             columns={rowColumns}
             pagination={rowsTable.pagination}
             setPagination={rowsTable.setPagination}
-            totalCount={rowsResult?.total ?? 0}
+            totalCount={shownRows?.total ?? 0}
             count={rows.length}
             isFetching={rowsFetching}
           />
@@ -595,54 +608,62 @@ export default function ReportSourceDetailPage() {
         <CardHeader>
           <CardTitle className="text-base">Advanced</CardTitle>
           <CardDescription>
-            Only change the header row if the columns above look wrong. Leave it
-            empty to let the importer find the header itself.
-            {source.all_tabs
-              ? " It applies to every tab."
-              : " For a spreadsheet with a tab per month, import every tab."}
+            {source.reads_whole_tab
+              ? "This sheet's report reads whole tabs, so every tab is imported from its first row and there is no header row to set."
+              : "Only change the header row if the columns above look wrong. Leave it empty to let the importer find the header itself."}
+            {source.reads_whole_tab
+              ? null
+              : source.all_tabs
+                ? " It applies to every tab."
+                : " For a spreadsheet with a tab per month, import every tab."}
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-8">
-            <div className="space-y-2">
-              <Label htmlFor="header-row">Header row</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="header-row"
-                  className="h-9 w-32"
-                  inputMode="numeric"
-                  placeholder="Auto"
-                  value={headerRowValue}
-                  onChange={(event) => setHeaderRowDraft(event.target.value)}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={save.isPending || headerRowDraft === null}
-                  onClick={() => {
-                    const trimmed = (headerRowDraft ?? "").trim()
-                    if (trimmed === "") {
-                      save.mutate({ header_row: null })
-                      return
-                    }
-                    const parsed = Number(trimmed)
-                    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100) {
-                      toast.error("Header row must be a whole number from 1 to 100")
-                      return
-                    }
-                    save.mutate({ header_row: parsed })
-                  }}
-                >
-                  {save.isPending ? "Saving…" : "Save and re-import"}
-                </Button>
+        {/* Everything wraps: the Card clips what does not fit, and the controls only fit on one
+            line on wide screens. */}
+        <CardContent className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:gap-8">
+            {/* The API rejects a header row on a sheet that reads whole tabs. */}
+            {source.reads_whole_tab ? null : (
+              <div className="space-y-2">
+                <Label htmlFor="header-row">Header row</Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    id="header-row"
+                    className="h-9 w-32"
+                    inputMode="numeric"
+                    placeholder="Auto"
+                    value={headerRowValue}
+                    onChange={(event) => setHeaderRowDraft(event.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={save.isPending || headerRowDraft === null}
+                    onClick={() => {
+                      const trimmed = (headerRowDraft ?? "").trim()
+                      if (trimmed === "") {
+                        save.mutate({ header_row: null })
+                        return
+                      }
+                      const parsed = Number(trimmed)
+                      if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100) {
+                        toast.error("Header row must be a whole number from 1 to 100")
+                        return
+                      }
+                      save.mutate({ header_row: parsed })
+                    }}
+                  >
+                    {save.isPending ? "Saving…" : "Save and re-import"}
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="space-y-2">
               <p className="text-sm leading-none font-medium">Tabs</p>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm whitespace-nowrap text-muted-foreground">
                   {source.all_tabs ? "Every tab" : "This tab only"}
                 </span>
                 <Button
