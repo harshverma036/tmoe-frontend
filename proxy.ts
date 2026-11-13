@@ -8,6 +8,7 @@ const AUTH_ROUTE_SEGMENTS = [
   "verify-email",
   "waiting-approval",
   "email-verified",
+  "set-password",
 ] as const
 
 function firstPathSegment(pathname: string): string {
