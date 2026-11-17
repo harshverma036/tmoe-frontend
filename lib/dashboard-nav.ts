@@ -4,7 +4,6 @@ import {
   FileSpreadsheet,
   LayoutDashboard,
   LayoutGrid,
-  LineChart,
   Link2,
   Megaphone,
   Settings,
@@ -75,12 +74,6 @@ export const dashboardNavItems: DashboardNavItem[] = [
     href: "/promote-links",
     icon: Link2,
     allowed_roles: [UserRole.ADMIN, UserRole.PUBLISHER],
-  },
-  {
-    label: "ROI Benchmarks",
-    href: "/roi-benchmarks",
-    icon: LineChart,
-    allowed_roles: [UserRole.ADMIN],
   },
   {
     label: "Reports",
