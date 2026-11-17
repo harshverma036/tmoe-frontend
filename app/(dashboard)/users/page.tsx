@@ -24,7 +24,7 @@ import { UserRole } from "@/lib/dashboard-nav"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AxiosError } from "axios"
 import { format } from "date-fns"
-import { Loader2, Trash, UserPlus } from "lucide-react"
+import { Check, Loader2, Trash, UserPlus } from "lucide-react"
 import _ from "lodash"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useMemo, useState, useEffect, useRef } from "react"
@@ -51,7 +51,13 @@ type PendingDeleteUser = {
   email: string
 }
 
-type UserTab = "all" | "publishers" | "brands" | "admins" | "suspended"
+type UserTab =
+  | "all"
+  | "publishers"
+  | "brands"
+  | "admins"
+  | "pending"
+  | "suspended"
 
 const emailLooksValid = (value: string) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
@@ -61,8 +67,10 @@ function formatCount(value: number) {
 }
 
 function getUserStatus(user: UserRecord) {
-  if (user.active === false) return "suspended"
+  // New brand/publisher signups are created with active=false until admin
+  // approval — treat unapproved accounts as pending, not suspended.
   if (!user.admin_approved) return "pending"
+  if (user.active === false) return "suspended"
   return "active"
 }
 
@@ -109,6 +117,7 @@ function parseUserTab(value: string | null): UserTab {
     value === "publishers" ||
     value === "brands" ||
     value === "admins" ||
+    value === "pending" ||
     value === "suspended"
   ) {
     return value
@@ -176,18 +185,15 @@ const UsersPage = () => {
     const admins = records.filter(
       (user) => user.role?.toUpperCase() === UserRole.ADMIN
     )
-    const suspended = records.filter((user) => {
-      const status = getUserStatus(user)
-      return status === "suspended" || status === "pending"
-    })
-
     return {
       total: metricsData?.count ?? records.length,
       publishers: publishers.length,
       brands: brands.length,
       admins: admins.length,
-      suspended: suspended.length,
       pending: records.filter((user) => !user.admin_approved).length,
+      suspended: records.filter(
+        (user) => user.admin_approved && user.active === false
+      ).length,
     }
   }, [metricsData])
 
@@ -219,6 +225,7 @@ const UsersPage = () => {
     { id: "publishers", label: "Publishers", count: metrics.publishers },
     { id: "brands", label: "Brands", count: metrics.brands },
     { id: "admins", label: "Admins", count: metrics.admins },
+    { id: "pending", label: "Pending review", count: metrics.pending },
     { id: "suspended", label: "Suspended", count: metrics.suspended },
   ]
 
@@ -297,7 +304,7 @@ const UsersPage = () => {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <MetricCard
           label="Total users"
           value={formatCount(metrics.total)}
@@ -319,9 +326,14 @@ const UsersPage = () => {
           sublabel="TMOE staff"
         />
         <MetricCard
-          label="Suspended / review"
+          label="Pending review"
+          value={formatCount(metrics.pending)}
+          sublabel="awaiting approval"
+        />
+        <MetricCard
+          label="Suspended"
           value={formatCount(metrics.suspended)}
-          sublabel="requires action"
+          sublabel="inactive accounts"
         />
       </div>
 
@@ -501,6 +513,22 @@ const UsersPage = () => {
                       </TableCell> */}
                       <TableCell className="pr-5 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {status === "pending" ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="h-8 gap-1.5 rounded-lg px-3 shadow-none"
+                              onClick={() =>
+                                setPendingApproveUser({
+                                  id: user.id,
+                                  email: user.email,
+                                })
+                              }
+                            >
+                              <Check className="size-4" />
+                              Approve
+                            </Button>
+                          ) : null}
                           <Button
                             type="button"
                             variant="ghost"
