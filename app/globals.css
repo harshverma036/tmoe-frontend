@@ -80,6 +80,13 @@
     --sidebar-accent-foreground: oklch(0.4 0.14 25);
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.708 0 0);
+    /* Data-viz series (validated palette; see the dataviz skill): 1 = blue, 2 = orange. */
+    --viz-1: #2a78d6;
+    --viz-2: #eb6834;
+    /* De-emphasised marks (e.g. cancelled bookings), gridlines and axis text. */
+    --viz-muted: #c4c3bd;
+    --viz-grid: #ecebe7;
+    --viz-axis: #6b6a65;
 }
 
 .dark {
@@ -114,6 +121,11 @@
     --sidebar-accent-foreground: oklch(0.95 0.02 250);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
+    --viz-1: #3987e5;
+    --viz-2: #d95926;
+    --viz-muted: #55544f;
+    --viz-grid: #2c2c2a;
+    --viz-axis: #a3a29b;
 }
 
 @layer base {

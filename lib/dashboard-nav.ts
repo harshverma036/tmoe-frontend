@@ -1,4 +1,5 @@
 import {
+  BedDouble,
   CalendarDays,
   FileChartColumn,
   FileSpreadsheet,
@@ -79,6 +80,12 @@ export const dashboardNavItems: DashboardNavItem[] = [
     label: "Reports",
     href: "/reports",
     icon: FileChartColumn,
+    allowed_roles: [UserRole.ADMIN],
+  },
+  {
+    label: "Agoda",
+    href: "/agoda",
+    icon: BedDouble,
     allowed_roles: [UserRole.ADMIN],
   },
   {
