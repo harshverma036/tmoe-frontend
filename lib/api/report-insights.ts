@@ -128,7 +128,15 @@ export async function fetchReportInsights(params: {
       end_date: params.end_date,
     },
   })
-  const data = (response.data?.data ?? {}) as Partial<ReportInsights>
+  return normalizeReportInsights(response.data?.data, params)
+}
+
+/** The report-insights payload with the fields an older API leaves out filled in. */
+export function normalizeReportInsights(
+  payload: unknown,
+  params: { brand_profile_id: string; start_date: string; end_date: string },
+): ReportInsights {
+  const data = (payload ?? {}) as Partial<ReportInsights>
   return {
     brand: data.brand ?? { id: params.brand_profile_id, brand_name: "" },
     start_date: data.start_date ?? params.start_date,

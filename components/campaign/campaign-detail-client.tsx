@@ -352,7 +352,13 @@ export function CampaignDetailClient({ id }: { id: string }) {
   }
 
   return (
-    <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-500 mx-auto max-w-4xl space-y-8">
+    <div
+      className={cn(
+        "animate-in fade-in-0 slide-in-from-bottom-1 duration-500 mx-auto space-y-8",
+        // Reports are wide tables and charts; the other tabs read better narrow.
+        detailTab === "performance" ? "max-w-6xl" : "max-w-4xl",
+      )}
+    >
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="ghost" size="sm" asChild className="-ml-2 gap-1">
           <Link href="/campaign">
@@ -546,7 +552,7 @@ export function CampaignDetailClient({ id }: { id: string }) {
           </div>
 
           {detailTab === "performance" ? (
-            <CampaignPerformancePanel campaign={campaign} />
+            <CampaignPerformancePanel campaign={campaign} role={role} />
           ) : null}
 
           {detailTab === "applications" && showApplicationsTab ? (

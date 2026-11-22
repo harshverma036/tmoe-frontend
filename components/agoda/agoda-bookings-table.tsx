@@ -41,8 +41,11 @@ import {
 import {
   agodaQueryKeys,
   fetchAgodaBookings,
+  type AgodaBooking,
   type AgodaBookingSort,
+  type AgodaBookingsParams,
   type AgodaReportParams,
+  type Paged,
   type AgodaStatusGroup,
 } from "@/lib/api/agoda"
 
@@ -73,9 +76,15 @@ const SORT_OPTIONS: { value: string; label: string }[] = [
 export function AgodaBookingsTable({
   params,
   countries,
+  fetchBookings = fetchAgodaBookings,
+  scopeKey = "all",
 }: {
   params: AgodaReportParams
   countries: { name: string; bookings: number }[]
+  /** Where the rows come from; the admin Agoda API unless a campaign passes its own. */
+  fetchBookings?: (params: AgodaBookingsParams) => Promise<Paged<AgodaBooking>>
+  /** Tells cached pages from different sources apart (e.g. a campaign id). */
+  scopeKey?: string
 }) {
   const [searchDraft, setSearchDraft] = useState("")
   const [search, setSearch] = useState("")
@@ -105,6 +114,7 @@ export function AgodaBookingsTable({
   const query = useQuery({
     queryKey: [
       ...agodaQueryKeys.bookings,
+      scopeKey,
       params,
       search,
       status,
@@ -113,7 +123,7 @@ export function AgodaBookingsTable({
       page,
     ],
     queryFn: () =>
-      fetchAgodaBookings({
+      fetchBookings({
         ...params,
         search: search || undefined,
         status: status === ALL ? undefined : (status as AgodaStatusGroup),
