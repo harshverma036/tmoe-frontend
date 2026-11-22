@@ -20,6 +20,12 @@ export function campaignToFormValues(c: Campaign): CampaignBriefFormValues {
     commerce_links: c.commerce_links.length ? [...c.commerce_links] : [""],
     submit_for_review: false,
     description: c.description ?? "",
+    primary_keywords: c.primary_keywords?.length ? [...c.primary_keywords] : [],
+    secondary_keywords: c.secondary_keywords?.length
+      ? [...c.secondary_keywords]
+      : [],
+    search_intent: c.search_intent ?? "",
+    content_placement_id: c.content_placement_id ?? "",
   }
 }
 
@@ -44,6 +50,18 @@ export function formValuesToCreateBody(
   }
   const d = v.description?.trim()
   if (d) body.description = d
+  if (v.primary_keywords?.length) {
+    body.primary_keywords = v.primary_keywords.map((s) => s.trim()).filter(Boolean)
+  }
+  if (v.secondary_keywords?.length) {
+    body.secondary_keywords = v.secondary_keywords
+      .map((s) => s.trim())
+      .filter(Boolean)
+  }
+  const intent = v.search_intent?.trim()
+  if (intent) body.search_intent = intent as CreateCampaignBody["search_intent"]
+  const placementId = v.content_placement_id?.trim()
+  if (placementId) body.content_placement_id = placementId
   return body
 }
 
@@ -59,6 +77,10 @@ const FORM_KEYS: (keyof CampaignBriefFormValues)[] = [
   "commerce_links",
   "submit_for_review",
   "description",
+  "primary_keywords",
+  "secondary_keywords",
+  "search_intent",
+  "content_placement_id",
 ]
 
 export function buildCampaignUpdateBody(
@@ -71,6 +93,16 @@ export function buildCampaignUpdateBody(
       const val = next[key]
       if (key === "description") {
         ;(patch as Record<string, unknown>)[key] = String(val ?? "").trim()
+        continue
+      }
+      if (key === "search_intent") {
+        const intent = String(val ?? "").trim()
+        ;(patch as Record<string, unknown>)[key] = intent || null
+        continue
+      }
+      if (key === "content_placement_id") {
+        const placementId = String(val ?? "").trim()
+        ;(patch as Record<string, unknown>)[key] = placementId || null
         continue
       }
       ;(patch as Record<string, unknown>)[key] = val

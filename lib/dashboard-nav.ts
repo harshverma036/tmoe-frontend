@@ -1,9 +1,14 @@
 import {
+  BedDouble,
   CalendarDays,
+  FileChartColumn,
+  FileSpreadsheet,
   LayoutDashboard,
-  LineChart,
+  LayoutGrid,
+  Link2,
   Megaphone,
   Settings,
+  Store,
   Users,
   type LucideIcon,
 } from "lucide-react"
@@ -42,9 +47,21 @@ export const dashboardNavItems: DashboardNavItem[] = [
     allowed_roles: [UserRole.ADMIN],
   },
   {
+    label: "Content Placement",
+    href: "/content-placements",
+    icon: LayoutGrid,
+    allowed_roles: [UserRole.ADMIN],
+  },
+  {
     label: "Slots",
     href: "/content-slots",
     icon: CalendarDays,
+    allowed_roles: [UserRole.PUBLISHER],
+  },
+  {
+    label: "Marketplace",
+    href: "/campaign/marketplace",
+    icon: Store,
     allowed_roles: [UserRole.PUBLISHER],
   },
   {
@@ -54,9 +71,27 @@ export const dashboardNavItems: DashboardNavItem[] = [
     allowed_roles: [UserRole.ADMIN, UserRole.BRAND, UserRole.PUBLISHER],
   },
   {
-    label: "ROI Benchmarks",
-    href: "/roi-benchmarks",
-    icon: LineChart,
+    label: "Promote Links",
+    href: "/promote-links",
+    icon: Link2,
+    allowed_roles: [UserRole.ADMIN, UserRole.PUBLISHER],
+  },
+  {
+    label: "Reports",
+    href: "/reports",
+    icon: FileChartColumn,
+    allowed_roles: [UserRole.ADMIN],
+  },
+  {
+    label: "Agoda",
+    href: "/agoda",
+    icon: BedDouble,
+    allowed_roles: [UserRole.ADMIN],
+  },
+  {
+    label: "Report Sources",
+    href: "/report-sources",
+    icon: FileSpreadsheet,
     allowed_roles: [UserRole.ADMIN],
   },
   {
@@ -96,6 +131,17 @@ export function dashboardNavMatchesPath(pathname: string, href: string) {
   if (pathname === href) return true
   if (href !== "/" && pathname.startsWith(`${href}/`)) return true
   return false
+}
+
+/** Longest matching nav href wins (e.g. /campaign/marketplace over /campaign). */
+export function getActiveNavHref(
+  pathname: string,
+  navItems: DashboardNavItem[],
+): string | null {
+  const match = navItems
+    .filter((item) => dashboardNavMatchesPath(pathname, item.href))
+    .sort((a, b) => b.href.length - a.href.length)[0]
+  return match?.href ?? null
 }
 
 /** Label for the top bar; prefers the longest matching nav prefix (nested routes). */

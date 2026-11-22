@@ -40,12 +40,15 @@ export function NotificationBell() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
-          <Bell className="size-4" aria-hidden />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative size-9 rounded-xl"
+          aria-label="Notifications"
+        >
+          <Bell className="size-[18px]" aria-hidden />
           {unread > 0 ? (
-            <span className="bg-primary text-primary-foreground absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full text-[10px] font-bold">
-              {unread > 9 ? "9+" : unread}
-            </span>
+            <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-primary ring-2 ring-card" />
           ) : null}
         </Button>
       </DropdownMenuTrigger>

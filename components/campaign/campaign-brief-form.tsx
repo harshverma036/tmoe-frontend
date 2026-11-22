@@ -5,15 +5,23 @@ import { yupResolver } from "@hookform/resolvers/yup"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { AxiosError } from "axios"
 import { Loader2 } from "lucide-react"
-import { useForm, type Resolver, Controller } from "react-hook-form"
+import { useForm, type FieldErrors, type Resolver, Controller } from "react-hook-form"
 import toast from "react-hot-toast"
 
 import { CategoryMultiSelect } from "@/components/campaign/category-multi-select"
+import { ContentPlacementSelectField } from "@/components/content-placement/content-placement-select-field"
 import { RepeatableTextList } from "@/components/campaign/repeatable-text-list"
 import { SkuTagInput } from "@/components/campaign/sku-tag-input"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import {
   campaignQueryKey,
@@ -31,6 +39,7 @@ import {
   campaignBriefEmptyValues,
   type CampaignBriefFormValues,
 } from "@/lib/validation/campaign-brief-form"
+import { SEARCH_INTENT_OPTIONS } from "@/lib/search-intent"
 
 type CampaignBriefFormProps = {
   mode: "create" | "edit"
@@ -50,6 +59,33 @@ function flattenArrayError(err: unknown): string | undefined {
   return undefined
 }
 
+function getApiErrorMessage(error: AxiosError<{ message?: string | string[] }>) {
+  const msg = error.response?.data?.message
+  if (Array.isArray(msg)) return msg.join(", ")
+  if (typeof msg === "string" && msg.trim()) return msg
+  return undefined
+}
+
+function getFirstFormError(
+  errors: FieldErrors<CampaignBriefFormValues>,
+): string | undefined {
+  if (errors.root?.message) return String(errors.root.message)
+
+  for (const key of Object.keys(errors) as (keyof CampaignBriefFormValues)[]) {
+    const err = errors[key]
+    if (!err) continue
+    const direct = flattenArrayError(err)
+    if (direct) return direct
+    if (err && typeof err === "object" && "root" in err) {
+      const rootMsg = flattenArrayError(
+        (err as { root?: { message?: string } }).root,
+      )
+      if (rootMsg) return rootMsg
+    }
+  }
+  return undefined
+}
+
 export function CampaignBriefForm({
   mode,
   campaignId,
@@ -59,7 +95,7 @@ export function CampaignBriefForm({
   onCancel,
 }: CampaignBriefFormProps) {
   const queryClient = useQueryClient()
-  const reviewIntent = useRef(false)
+  const submitForReviewRef = useRef(false)
   const mergedDefaults: CampaignBriefFormValues = {
     ...campaignBriefEmptyValues,
     ...defaultValues,
@@ -84,12 +120,19 @@ export function CampaignBriefForm({
       if (!result) return
       queryClient.invalidateQueries({ queryKey: campaignsQueryKeyRoot })
       queryClient.invalidateQueries({ queryKey: campaignQueryKey(result.id) })
-      toast.success(mode === "create" ? "Campaign created" : "Campaign updated")
+      const submitted = submitForReviewRef.current
+      toast.success(
+        mode === "create"
+          ? submitted
+            ? "Campaign submitted for review"
+            : "Campaign saved as draft"
+          : "Campaign updated",
+      )
       onSuccess?.(result)
     },
-    onError: (error: AxiosError<{ message?: string }>) => {
+    onError: (error: AxiosError<{ message?: string | string[] }>) => {
       toast.error(
-        error.response?.data?.message ??
+        getApiErrorMessage(error) ??
           (mode === "create"
             ? "Could not create campaign"
             : "Could not update campaign"),
@@ -108,14 +151,36 @@ export function CampaignBriefForm({
       campaignBriefCreateSchema,
     ) as Resolver<CampaignBriefFormValues>,
     mode: "onTouched",
+    shouldFocusError: true,
   })
 
-  async function onValidSubmit(values: CampaignBriefFormValues) {
+  async function onValidSubmit(
+    values: CampaignBriefFormValues,
+    submitForReview: boolean,
+  ) {
+    submitForReviewRef.current = submitForReview
     const payload: CampaignBriefFormValues =
-      mode === "create"
-        ? { ...values, submit_for_review: reviewIntent.current }
-        : values
-    await saveMutation.mutateAsync(payload)
+      mode === "create" ? { ...values, submit_for_review: submitForReview } : values
+    try {
+      await saveMutation.mutateAsync(payload)
+    } catch {
+      // Mutation onError shows toast.
+    }
+  }
+
+  function onInvalidSubmit(errors: FieldErrors<CampaignBriefFormValues>) {
+    const message =
+      getFirstFormError(errors) ??
+      "Please fix the highlighted fields before continuing."
+    toast.error(message)
+  }
+
+  function runSubmit(submitForReview: boolean) {
+    submitForReviewRef.current = submitForReview
+    void handleSubmit(
+      (values) => onValidSubmit(values, submitForReview),
+      onInvalidSubmit,
+    )()
   }
 
   const pending = isSubmitting || saveMutation.isPending
@@ -245,7 +310,11 @@ export function CampaignBriefForm({
               <p className="text-destructive text-xs font-medium" role="alert">
                 {errors.gmv_target.message}
               </p>
-            ) : null}
+            ) : (
+              <p className="text-muted-foreground text-xs">
+                Provide GMV and/or ROI target below.
+              </p>
+            )}
           </div>
           <div className="grid gap-2">
             <Label htmlFor="roi-target">ROI target (optional)</Label>
@@ -299,6 +368,85 @@ export function CampaignBriefForm({
           />
         </div>
 
+        <Controller
+          name="content_placement_id"
+          control={control}
+          render={({ field }) => (
+            <ContentPlacementSelectField
+              value={field.value}
+              onChange={field.onChange}
+              disabled={pending}
+              error={errors.content_placement_id?.message}
+            />
+          )}
+        />
+
+        <div className="rounded-xl border border-border/80 bg-muted/20 p-4 space-y-4">
+          <div>
+            <p className="text-sm font-medium">AEO optimization</p>
+            <p className="text-muted-foreground text-xs">
+              Keywords and search intent for answer engine optimization.
+            </p>
+          </div>
+
+          <Controller
+            name="primary_keywords"
+            control={control}
+            render={({ field }) => (
+              <SkuTagInput
+                value={field.value}
+                onChange={field.onChange}
+                label="Primary keywords"
+                placeholder="Type a keyword and press Enter"
+                disabled={pending}
+              />
+            )}
+          />
+
+          <Controller
+            name="secondary_keywords"
+            control={control}
+            render={({ field }) => (
+              <SkuTagInput
+                value={field.value}
+                onChange={field.onChange}
+                label="Secondary keywords"
+                placeholder="Type a keyword and press Enter"
+                disabled={pending}
+              />
+            )}
+          />
+
+          <Controller
+            name="search_intent"
+            control={control}
+            render={({ field }) => (
+              <div className="grid gap-2">
+                <Label>Search intent</Label>
+                <Select
+                  value={field.value || "none"}
+                  onValueChange={(v) =>
+                    field.onChange(v === "none" ? "" : v)
+                  }
+                  disabled={pending}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select intent (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Not specified</SelectItem>
+                    {SEARCH_INTENT_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          />
+        </div>
+
         <div className="flex flex-wrap gap-3 pt-2">
           {mode === "create" ? (
             <>
@@ -307,12 +455,9 @@ export function CampaignBriefForm({
                 variant="secondary"
                 disabled={pending}
                 className="min-w-36"
-                onClick={() => {
-                  reviewIntent.current = false
-                  void handleSubmit(onValidSubmit)()
-                }}
+                onClick={() => runSubmit(false)}
               >
-                {pending && !reviewIntent.current ? (
+                {pending && !submitForReviewRef.current ? (
                   <>
                     <Loader2 className="size-4 animate-spin" aria-hidden />
                     Saving…
@@ -325,12 +470,9 @@ export function CampaignBriefForm({
                 type="button"
                 disabled={pending}
                 className="min-w-36"
-                onClick={() => {
-                  reviewIntent.current = true
-                  void handleSubmit(onValidSubmit)()
-                }}
+                onClick={() => runSubmit(true)}
               >
-                {pending && reviewIntent.current ? (
+                {pending && submitForReviewRef.current ? (
                   <>
                     <Loader2 className="size-4 animate-spin" aria-hidden />
                     Submitting…
@@ -344,10 +486,7 @@ export function CampaignBriefForm({
             <Button
               type="button"
               disabled={pending}
-              onClick={() => {
-                reviewIntent.current = false
-                void handleSubmit(onValidSubmit)()
-              }}
+              onClick={() => runSubmit(false)}
             >
               {pending ? (
                 <>

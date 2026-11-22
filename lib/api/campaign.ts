@@ -1,6 +1,10 @@
 import apiConfig from "@/lib/apiConfig"
+import { normalizeContentPlacement } from "@/lib/api/content-placements"
 import type {
   Campaign,
+  CampaignApplication,
+  CampaignApplicationListResult,
+  CampaignApplicationStatus,
   CampaignListResult,
   CampaignStatus,
   CampaignStatusHistoryEntry,
@@ -8,6 +12,8 @@ import type {
   CreateAdminCampaignBody,
   CreateCampaignBody,
   EstimateCampaignBody,
+  MarketplaceCampaign,
+  MarketplaceListResult,
   RoiEstimate,
   UpdateCampaignBody,
 } from "@/lib/campaign.types"
@@ -29,6 +35,79 @@ export function campaignQueryKey(id: string) {
 
 export function campaignHistoryQueryKey(id: string) {
   return ["campaign", id, "history"] as const
+}
+
+export const marketplaceQueryKeyRoot = ["campaign-marketplace"] as const
+
+export function marketplaceQueryKey(filters: {
+  search?: string
+  limit: number
+  skip: number
+}) {
+  return [...marketplaceQueryKeyRoot, filters] as const
+}
+
+export function campaignApplicationsQueryKey(campaignId: string) {
+  return ["campaign", campaignId, "applications"] as const
+}
+
+function normalizeApplication(row: Record<string, unknown>): CampaignApplication {
+  const pubProf = (row.publisher_profile ?? row.publisherProfile) as
+    | Record<string, unknown>
+    | undefined
+  const reviewedBy = (row.reviewed_by ?? row.reviewedBy) as
+    | Record<string, unknown>
+    | undefined
+  return {
+    id: String(row.id ?? ""),
+    campaign_id: (row.campaign_id ?? row.campaignId) as string | undefined,
+    publisher_profile_id: (row.publisher_profile_id ??
+      row.publisherProfileId) as string | undefined,
+    status: String(row.status ?? "PENDING").toUpperCase() as CampaignApplicationStatus,
+    note: (row.note as string) ?? null,
+    rejection_note: (row.rejection_note ?? row.rejectionNote) as string | null,
+    reviewed_at: (row.reviewed_at ?? row.reviewedAt) as string | null,
+    created_at: (row.created_at ?? row.createdAt) as string | null,
+    publisher_profile: pubProf
+      ? {
+          id: String(pubProf.id ?? ""),
+          publication_name: (pubProf.publication_name ??
+            pubProf.publicationName) as string | null,
+          content_categories: asStringArray(
+            pubProf.content_categories ?? pubProf.contentCategories,
+          ),
+          monthly_sessions: asNumber(
+            pubProf.monthly_sessions ?? pubProf.monthlySessions,
+          ),
+          user: pubProf.user as {
+            id: string
+            name?: string | null
+            email: string
+          },
+        }
+      : undefined,
+    reviewed_by: reviewedBy
+      ? {
+          id: String(reviewedBy.id ?? ""),
+          name: (reviewedBy.name as string) ?? null,
+          email: String(reviewedBy.email ?? ""),
+        }
+      : null,
+  }
+}
+
+function normalizeMarketplaceCampaign(row: Record<string, unknown>): MarketplaceCampaign {
+  const campaign = normalizeCampaign(row)
+  const myAppRaw = row.my_application ?? row.myApplication
+  const myApp = Array.isArray(myAppRaw)
+    ? myAppRaw[0]
+    : myAppRaw
+  return {
+    ...campaign,
+    my_application: myApp
+      ? normalizeApplication(myApp as Record<string, unknown>)
+      : null,
+  }
 }
 
 function readProp(
@@ -108,6 +187,10 @@ export function normalizeCampaign(row: Record<string, unknown>): Campaign {
     | Record<string, unknown>
     | undefined
 
+  const placementRaw = readProp(row, "content_placement", "contentPlacement") as
+    | Record<string, unknown>
+    | undefined
+
   return {
     id,
     name: String(readProp(row, "name", "name") ?? ""),
@@ -138,6 +221,23 @@ export function normalizeCampaign(row: Record<string, unknown>): Campaign {
     est_orders: asNumber(readProp(row, "est_orders", "estOrders")),
     est_gmv: asNumber(readProp(row, "est_gmv", "estGmv")),
     est_roi: asNumber(readProp(row, "est_roi", "estRoi")),
+    primary_keywords: asStringArray(
+      readProp(row, "primary_keywords", "primaryKeywords"),
+    ),
+    secondary_keywords: asStringArray(
+      readProp(row, "secondary_keywords", "secondaryKeywords"),
+    ),
+    search_intent: (() => {
+      const v = readProp(row, "search_intent", "searchIntent")
+      if (!v) return null
+      return String(v).toUpperCase() as Campaign["search_intent"]
+    })(),
+    content_placement_id:
+      (readProp(row, "content_placement_id", "contentPlacementId") as string) ??
+      null,
+    content_placement: placementRaw
+      ? normalizeContentPlacement(placementRaw)
+      : null,
     brand_profile: brandRaw
       ? {
           id: String(brandRaw.id ?? ""),
@@ -380,4 +480,88 @@ export async function rejectCampaignAssignment(
   await apiConfig.patch(`/api/campaign/${id}/reject-assignment`, {
     note: note?.trim() || undefined,
   })
+}
+
+export async function fetchMarketplaceCampaigns(params: {
+  search?: string
+  limit?: number
+  skip?: number
+}): Promise<MarketplaceListResult> {
+  const { data } = await apiConfig.get("/api/campaign/marketplace", {
+    params: {
+      search: params.search?.trim() || undefined,
+      limit: params.limit ?? 12,
+      skip: params.skip ?? 0,
+    },
+  })
+  const root = data as Record<string, unknown>
+  const rows = (root.data ?? []) as unknown[]
+  const total =
+    typeof root.total === "number" ? root.total : Array.isArray(rows) ? rows.length : 0
+  return {
+    items: Array.isArray(rows)
+      ? rows.map((r) => normalizeMarketplaceCampaign(r as Record<string, unknown>))
+      : [],
+    total,
+    page: typeof root.page === "number" ? root.page : undefined,
+    pageSize: typeof root.pageSize === "number" ? root.pageSize : undefined,
+  }
+}
+
+export async function fetchMarketplaceCampaignById(
+  id: string,
+): Promise<MarketplaceCampaign> {
+  const { data } = await apiConfig.get(`/api/campaign/marketplace/${id}`)
+  const raw = unwrapPayload(data)
+  return normalizeMarketplaceCampaign(raw)
+}
+
+export async function applyToCampaign(
+  id: string,
+  note?: string,
+): Promise<CampaignApplication> {
+  const { data } = await apiConfig.post(`/api/campaign/${id}/apply`, {
+    note: note?.trim() || undefined,
+  })
+  const raw = unwrapPayload(data)
+  return normalizeApplication(raw)
+}
+
+export async function fetchCampaignApplications(
+  campaignId: string,
+  params?: { status?: CampaignApplicationStatus; limit?: number; skip?: number },
+): Promise<CampaignApplicationListResult> {
+  const { data } = await apiConfig.get(`/api/campaign/${campaignId}/applications`, {
+    params: {
+      status: params?.status,
+      limit: params?.limit ?? 20,
+      skip: params?.skip ?? 0,
+    },
+  })
+  const root = data as Record<string, unknown>
+  const rows = (root.data ?? []) as unknown[]
+  const total =
+    typeof root.total === "number" ? root.total : Array.isArray(rows) ? rows.length : 0
+  return {
+    items: Array.isArray(rows)
+      ? rows.map((r) => normalizeApplication(r as Record<string, unknown>))
+      : [],
+    total,
+    page: typeof root.page === "number" ? root.page : undefined,
+    pageSize: typeof root.pageSize === "number" ? root.pageSize : undefined,
+  }
+}
+
+export async function reviewCampaignApplication(
+  campaignId: string,
+  applicationId: string,
+  status: "APPROVED" | "REJECTED",
+  rejection_note?: string,
+): Promise<CampaignApplication> {
+  const { data } = await apiConfig.patch(
+    `/api/campaign/${campaignId}/applications/${applicationId}/review`,
+    { status, rejection_note: rejection_note?.trim() || undefined },
+  )
+  const raw = unwrapPayload(data)
+  return normalizeApplication(raw)
 }

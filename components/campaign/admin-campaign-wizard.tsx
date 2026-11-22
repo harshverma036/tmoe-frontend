@@ -1,15 +1,23 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { AxiosError } from "axios"
+import { ArrowRight, Loader2 } from "lucide-react"
 import toast from "react-hot-toast"
 
 import { PublisherMultiSelect } from "@/components/campaign/publisher-multi-select"
+import { ContentPlacementSelectField } from "@/components/content-placement/content-placement-select-field"
+import { SkuTagInput } from "@/components/campaign/sku-tag-input"
 import { RoiEstimatorWidget } from "@/components/campaign/roi-estimator-widget"
+import {
+  WizardFooterNav,
+  WizardShell,
+  WizardStepHeader,
+  type WizardStep,
+} from "@/components/common/wizard-shell"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -25,9 +33,13 @@ import {
   convertFromBrief,
   createAdminCampaign,
   estimateCampaign,
+  updateAdminCampaign,
 } from "@/lib/api/campaign"
 import type { Campaign } from "@/lib/campaign.types"
+import type { SearchIntent } from "@/lib/campaign.types"
 import { fetchPublishersForAssignment } from "@/lib/api/publisher-search"
+import { fetchRoiBenchmarks } from "@/lib/api/roi-benchmarks"
+import { SEARCH_INTENT_OPTIONS } from "@/lib/search-intent"
 import apiConfig from "@/lib/apiConfig"
 
 type BrandOption = { id: string; brand_name: string }
@@ -37,7 +49,33 @@ type Props = {
   brief?: Campaign
 }
 
-const STEPS = ["Basics", "Publishers", "Budget", "ROI", "Review"] as const
+const WIZARD_STEPS: WizardStep[] = [
+  {
+    id: "basics",
+    label: "Campaign basics",
+    description: "Brand, market, and product details",
+  },
+  {
+    id: "publishers",
+    label: "Publisher selection",
+    description: "Assign publisher partners",
+  },
+  {
+    id: "budget",
+    label: "Budget & timeline",
+    description: "Spend split and campaign dates",
+  },
+  {
+    id: "roi",
+    label: "ROI estimation",
+    description: "Projected performance",
+  },
+  {
+    id: "review",
+    label: "Review & publish",
+    description: "Confirm details and save",
+  },
+]
 
 export function AdminCampaignWizard({ brief }: Props) {
   const router = useRouter()
@@ -53,6 +91,16 @@ export function AdminCampaignWizard({ brief }: Props) {
     brief?.commerce_links.join("\n") ?? "",
   )
   const [contentType, setContentType] = useState("Editorial")
+  const [contentPlacementId, setContentPlacementId] = useState(
+    brief?.content_placement_id ?? "",
+  )
+  const [primaryKeywords, setPrimaryKeywords] = useState<string[]>(
+    brief?.primary_keywords ?? [],
+  )
+  const [secondaryKeywords, setSecondaryKeywords] = useState<string[]>(
+    brief?.secondary_keywords ?? [],
+  )
+  const [searchIntent, setSearchIntent] = useState(brief?.search_intent ?? "")
   const [contentBudget, setContentBudget] = useState(
     String(brief?.budget_min ? Math.floor(brief.budget_min * 0.6) : ""),
   )
@@ -63,8 +111,13 @@ export function AdminCampaignWizard({ brief }: Props) {
   const [endDate, setEndDate] = useState("")
   const [publisherSearch, setPublisherSearch] = useState("")
   const [selectedPublishers, setSelectedPublishers] = useState<string[]>([])
-  const [roiCategory, setRoiCategory] = useState(brief?.target_category[0] ?? "")
+  const [roiCategory, setRoiCategory] = useState("")
   const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null)
+
+  const { data: roiBenchmarks = [] } = useQuery({
+    queryKey: ["roi-benchmarks"],
+    queryFn: fetchRoiBenchmarks,
+  })
 
   const { data: brands = [] } = useQuery({
     queryKey: ["brands-for-campaign"],
@@ -99,6 +152,19 @@ export function AdminCampaignWizard({ brief }: Props) {
       .map((s) => s.trim())
       .filter(Boolean)
 
+  useEffect(() => {
+    if (!roiBenchmarks.length || roiCategory) return
+    const hint =
+      brief?.target_category[0]?.trim() ||
+      splitLines(targetCategory.replace(/,/g, "\n"))[0]
+    const match = hint
+      ? roiBenchmarks.find(
+          (b) => b.category.toLowerCase() === hint.toLowerCase(),
+        )
+      : undefined
+    setRoiCategory(match?.category ?? roiBenchmarks[0].category)
+  }, [roiBenchmarks, roiCategory, brief?.target_category, targetCategory])
+
   const payload = useMemo(
     () => ({
       brand_profile_id: brandId,
@@ -113,6 +179,10 @@ export function AdminCampaignWizard({ brief }: Props) {
       start_date: startDate || undefined,
       end_date: endDate || undefined,
       publisher_ids: selectedPublishers,
+      primary_keywords: primaryKeywords,
+      secondary_keywords: secondaryKeywords,
+      search_intent: (searchIntent || undefined) as SearchIntent | undefined,
+      content_placement_id: contentPlacementId || undefined,
     }),
     [
       brandId,
@@ -127,42 +197,75 @@ export function AdminCampaignWizard({ brief }: Props) {
       startDate,
       endDate,
       selectedPublishers,
+      primaryKeywords,
+      secondaryKeywords,
+      searchIntent,
+      contentPlacementId,
     ],
   )
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      if (roiBenchmarks.length > 0 && !roiCategory.trim()) {
+        throw new Error(
+          "Select an ROI benchmark category on the ROI estimation step before saving.",
+        )
+      }
+
+      let campaign: Campaign
       if (brief) {
-        return convertFromBrief(brief.id, {
+        campaign = await convertFromBrief(brief.id, {
           content_budget: payload.content_budget,
           distribution_budget: payload.distribution_budget,
           content_type: payload.content_type,
           start_date: payload.start_date,
           end_date: payload.end_date,
           publisher_ids: payload.publisher_ids,
+          content_placement_id: payload.content_placement_id,
         })
+        await updateAdminCampaign(campaign.id, {
+          primary_keywords: payload.primary_keywords,
+          secondary_keywords: payload.secondary_keywords,
+          search_intent: payload.search_intent,
+          ...(payload.content_placement_id
+            ? { content_placement_id: payload.content_placement_id }
+            : {}),
+        })
+      } else {
+        campaign = await createAdminCampaign(payload)
       }
-      return createAdminCampaign(payload)
-    },
-    onSuccess: async (campaign) => {
-      setCreatedCampaignId(campaign.id)
+
       if (selectedPublishers.length && !brief) {
         await assignPublishers(campaign.id, selectedPublishers)
       }
-      const estimateBody: Parameters<typeof estimateCampaign>[1] = {
-        content_budget: payload.content_budget,
-        distribution_budget: payload.distribution_budget,
-        category: roiCategory || payload.target_category[0],
+
+      if (roiCategory.trim()) {
+        const estimateBody: Parameters<typeof estimateCampaign>[1] = {
+          content_budget: payload.content_budget,
+          distribution_budget: payload.distribution_budget,
+          category: roiCategory.trim(),
+        }
+        if (selectedPublishers.length > 0) {
+          estimateBody.publisher_ids = selectedPublishers
+        }
+        await estimateCampaign(campaign.id, estimateBody)
       }
-      if (selectedPublishers.length > 0) {
-        estimateBody.publisher_ids = selectedPublishers
-      }
-      await estimateCampaign(campaign.id, estimateBody)
+
+      return campaign
+    },
+    onSuccess: (campaign) => {
+      setCreatedCampaignId(campaign.id)
       toast.success("Campaign saved as draft")
       router.push(`/campaign/${campaign.id}`)
     },
-    onError: (error: AxiosError<{ message?: string }>) => {
-      toast.error(error.response?.data?.message ?? "Could not save campaign")
+    onError: (error: unknown) => {
+      let message = "Could not save campaign"
+      if (error instanceof AxiosError) {
+        message = error.response?.data?.message ?? message
+      } else if (error instanceof Error) {
+        message = error.message
+      }
+      toast.error(message)
     },
   })
 
@@ -178,37 +281,130 @@ export function AdminCampaignWizard({ brief }: Props) {
     if (step === 2) {
       return Number(contentBudget) > 0 && Number(distBudget) > 0
     }
+    if (step >= 3 && roiBenchmarks.length > 0) {
+      return Boolean(roiCategory.trim())
+    }
     return true
   }
 
-  return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex flex-wrap gap-2">
-        {STEPS.map((label, i) => (
-          <Button
-            key={label}
-            type="button"
-            size="sm"
-            variant={step === i ? "default" : "outline"}
-            className="rounded-full"
-            onClick={() => setStep(i)}
-          >
-            {i + 1}. {label}
-          </Button>
-        ))}
-      </div>
+  const isLastStep = step === WIZARD_STEPS.length - 1
+  const currentStepMeta = WIZARD_STEPS[step]
+  const previousStepMeta = step > 0 ? WIZARD_STEPS[step - 1] : null
+  const nextStepMeta = !isLastStep ? WIZARD_STEPS[step + 1] : null
 
+  const pageTitle = brief ? "Convert brief to campaign" : "Create campaign"
+  const stepSubtitle = `Step ${step + 1} of ${WIZARD_STEPS.length} · ${currentStepMeta.label}`
+
+  const renderSaveDraftButton = () => (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="h-9 rounded-xl px-4 shadow-none"
+      disabled={!isLastStep || saveMutation.isPending || !canNext()}
+      onClick={() => saveMutation.mutate()}
+    >
+      {saveMutation.isPending ? (
+        <>
+          <Loader2 className="size-4 animate-spin" />
+          Saving…
+        </>
+      ) : (
+        "Save draft"
+      )}
+    </Button>
+  )
+
+  const continueButton = (
+    <Button
+      type="button"
+      size="sm"
+      className="h-9 gap-1.5 rounded-xl px-4 shadow-none"
+      disabled={!canNext() || saveMutation.isPending}
+      onClick={() => {
+        if (isLastStep) {
+          saveMutation.mutate()
+          return
+        }
+        setStep((current) => current + 1)
+      }}
+    >
+      {isLastStep ? (
+        brief ? "Convert to campaign" : "Create campaign (Draft)"
+      ) : (
+        <>
+          Continue
+          <ArrowRight className="size-4" />
+        </>
+      )}
+    </Button>
+  )
+
+  return (
+    <WizardShell
+      breadcrumbs={
+        <>
+          TMOE Admin <span className="mx-1.5">/</span>{" "}
+          {brief ? "Convert Brief" : "Create Campaign"}
+        </>
+      }
+      title={pageTitle}
+      stepSubtitle={stepSubtitle}
+      steps={WIZARD_STEPS}
+      currentStep={step}
+      onStepChange={setStep}
+      headerActions={
+        <>
+          {renderSaveDraftButton()}
+          {continueButton}
+        </>
+      }
+      footer={
+        <WizardFooterNav
+          backLabel={previousStepMeta?.label}
+          onBack={() => setStep((current) => Math.max(0, current - 1))}
+          backDisabled={step === 0}
+          secondaryAction={renderSaveDraftButton()}
+          primaryAction={
+            <Button
+              type="button"
+              size="sm"
+              className="h-9 gap-1.5 rounded-xl px-4 shadow-none"
+              disabled={!canNext() || saveMutation.isPending}
+              onClick={() => {
+                if (isLastStep) {
+                  saveMutation.mutate()
+                  return
+                }
+                setStep((current) => current + 1)
+              }}
+            >
+              {isLastStep ? (
+                brief ? "Convert to campaign" : "Create campaign (Draft)"
+              ) : (
+                <>
+                  Continue to {nextStepMeta?.label}
+                  <ArrowRight className="size-4" />
+                </>
+              )}
+            </Button>
+          }
+        />
+      }
+    >
       {step === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Campaign basics</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <>
+          <WizardStepHeader
+            stepNumber={1}
+            title="Campaign basics"
+            description="Set the brand, campaign name, categories, and commerce details."
+          />
+          <div className="space-y-4">
             {!brief ? (
               <div className="space-y-2">
                 <Label>Brand</Label>
                 <Select value={brandId} onValueChange={setBrandId}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10 rounded-xl border-border/80 bg-muted/20 shadow-none">
                     <SelectValue placeholder="Select brand" />
                   </SelectTrigger>
                   <SelectContent>
@@ -221,7 +417,7 @@ export function AdminCampaignWizard({ brief }: Props) {
                 </Select>
               </div>
             ) : (
-              <p className="text-muted-foreground text-sm">
+              <p className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
                 Converting brief for{" "}
                 <span className="font-medium text-foreground">
                   {brief.brand_profile?.brand_name}
@@ -230,7 +426,11 @@ export function AdminCampaignWizard({ brief }: Props) {
             )}
             <div className="space-y-2">
               <Label>Campaign name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="h-10 rounded-xl border-border/80 bg-muted/20 shadow-none"
+              />
             </div>
             <div className="space-y-2">
               <Label>Categories (comma or newline)</Label>
@@ -238,6 +438,7 @@ export function AdminCampaignWizard({ brief }: Props) {
                 value={targetCategory}
                 onChange={(e) => setTargetCategory(e.target.value)}
                 rows={2}
+                className="rounded-xl border-border/80 bg-muted/20 shadow-none"
               />
             </div>
             <div className="space-y-2">
@@ -245,6 +446,7 @@ export function AdminCampaignWizard({ brief }: Props) {
               <Input
                 value={targetMarket}
                 onChange={(e) => setTargetMarket(e.target.value)}
+                className="h-10 rounded-xl border-border/80 bg-muted/20 shadow-none"
               />
             </div>
             <div className="space-y-2">
@@ -253,6 +455,7 @@ export function AdminCampaignWizard({ brief }: Props) {
                 value={productSkus}
                 onChange={(e) => setProductSkus(e.target.value)}
                 rows={3}
+                className="rounded-xl border-border/80 bg-muted/20 shadow-none"
               />
             </div>
             <div className="space-y-2">
@@ -261,6 +464,7 @@ export function AdminCampaignWizard({ brief }: Props) {
                 value={commerceLinks}
                 onChange={(e) => setCommerceLinks(e.target.value)}
                 rows={3}
+                className="rounded-xl border-border/80 bg-muted/20 shadow-none"
               />
             </div>
             <div className="space-y-2">
@@ -268,36 +472,84 @@ export function AdminCampaignWizard({ brief }: Props) {
               <Input
                 value={contentType}
                 onChange={(e) => setContentType(e.target.value)}
+                className="h-10 rounded-xl border-border/80 bg-muted/20 shadow-none"
               />
             </div>
-          </CardContent>
-        </Card>
+            <ContentPlacementSelectField
+              value={contentPlacementId}
+              onChange={setContentPlacementId}
+            />
+            <div className="rounded-xl border border-border/70 bg-muted/10 p-4 space-y-4">
+              <div>
+                <p className="text-sm font-medium">AEO optimization</p>
+                <p className="text-muted-foreground text-xs">
+                  Keywords and search intent for content planning.
+                </p>
+              </div>
+              <SkuTagInput
+                id="primary-keywords"
+                label="Primary keywords"
+                value={primaryKeywords}
+                onChange={setPrimaryKeywords}
+                placeholder="Type a keyword and press Enter"
+              />
+              <SkuTagInput
+                id="secondary-keywords"
+                label="Secondary keywords"
+                value={secondaryKeywords}
+                onChange={setSecondaryKeywords}
+                placeholder="Type a keyword and press Enter"
+              />
+              <div className="space-y-2">
+                <Label>Search intent</Label>
+                <Select
+                  value={searchIntent || "none"}
+                  onValueChange={(v) => setSearchIntent(v === "none" ? "" : v)}
+                >
+                  <SelectTrigger className="h-10 rounded-xl border-border/80 bg-muted/20 shadow-none">
+                    <SelectValue placeholder="Select intent (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Not specified</SelectItem>
+                    {SEARCH_INTENT_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        </>
       ) : null}
 
       {step === 1 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Publisher selection</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <PublisherMultiSelect
-              publishers={publisherResults?.items ?? []}
-              value={selectedPublishers}
-              onChange={setSelectedPublishers}
-              search={publisherSearch}
-              onSearchChange={setPublisherSearch}
-              isLoading={publishersLoading}
-            />
-          </CardContent>
-        </Card>
+        <>
+          <WizardStepHeader
+            stepNumber={2}
+            title="Publisher selection"
+            description="Search and assign publishers to this campaign."
+          />
+          <PublisherMultiSelect
+            publishers={publisherResults?.items ?? []}
+            value={selectedPublishers}
+            onChange={setSelectedPublishers}
+            search={publisherSearch}
+            onSearchChange={setPublisherSearch}
+            isLoading={publishersLoading}
+          />
+        </>
       ) : null}
 
       {step === 2 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Budget breakdown</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2">
+        <>
+          <WizardStepHeader
+            stepNumber={3}
+            title="Budget & timeline"
+            description="Split spend between content and distribution, then set dates."
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Content budget (USD)</Label>
               <Input
@@ -305,6 +557,7 @@ export function AdminCampaignWizard({ brief }: Props) {
                 min={0}
                 value={contentBudget}
                 onChange={(e) => setContentBudget(e.target.value)}
+                className="h-10 rounded-xl border-border/80 bg-muted/20 shadow-none"
               />
             </div>
             <div className="space-y-2">
@@ -314,6 +567,7 @@ export function AdminCampaignWizard({ brief }: Props) {
                 min={0}
                 value={distBudget}
                 onChange={(e) => setDistBudget(e.target.value)}
+                className="h-10 rounded-xl border-border/80 bg-muted/20 shadow-none"
               />
             </div>
             <div className="space-y-2">
@@ -322,6 +576,7 @@ export function AdminCampaignWizard({ brief }: Props) {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
+                className="h-10 rounded-xl border-border/80 bg-muted/20 shadow-none"
               />
             </div>
             <div className="space-y-2">
@@ -330,44 +585,43 @@ export function AdminCampaignWizard({ brief }: Props) {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
+                className="h-10 rounded-xl border-border/80 bg-muted/20 shadow-none"
               />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </>
       ) : null}
 
-      {step === 3 && (createdCampaignId || brief?.id) ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>ROI estimation</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <RoiEstimatorWidget
-              campaignId={createdCampaignId ?? brief!.id}
-              defaultBody={{
-                content_budget: Number(contentBudget) || 0,
-                distribution_budget: Number(distBudget) || 0,
-                category: splitLines(targetCategory.replace(/,/g, "\n"))[0],
-                ...(selectedPublishers.length > 0
-                  ? { publisher_ids: selectedPublishers }
-                  : {}),
-              }}
-              onCategoryChange={setRoiCategory}
-            />
-          </CardContent>
-        </Card>
-      ) : step === 3 ? (
-        <p className="text-muted-foreground text-sm">
-          Save the campaign on the Review step to run ROI estimation.
-        </p>
+      {step === 3 ? (
+        <>
+          <WizardStepHeader
+            stepNumber={4}
+            title="ROI estimation"
+            description="Pick a benchmark category for projected traffic, orders, and return."
+          />
+          <RoiEstimatorWidget
+            campaignId={createdCampaignId ?? brief?.id}
+            defaultBody={{
+              content_budget: Number(contentBudget) || 0,
+              distribution_budget: Number(distBudget) || 0,
+              category: roiCategory || undefined,
+              ...(selectedPublishers.length > 0
+                ? { publisher_ids: selectedPublishers }
+                : {}),
+            }}
+            onCategoryChange={setRoiCategory}
+          />
+        </>
       ) : null}
 
       {step === 4 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Review</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm space-y-2">
+        <>
+          <WizardStepHeader
+            stepNumber={5}
+            title="Review & publish"
+            description="Confirm campaign details before saving as a draft."
+          />
+          <div className="space-y-3 rounded-xl border border-border/70 bg-muted/15 p-4 text-sm">
             <p>
               <span className="text-muted-foreground">Name:</span> {name}
             </p>
@@ -383,37 +637,15 @@ export function AdminCampaignWizard({ brief }: Props) {
               <span className="text-muted-foreground">Publishers:</span>{" "}
               {selectedPublishers.length}
             </p>
-          </CardContent>
-        </Card>
+            {roiCategory ? (
+              <p>
+                <span className="text-muted-foreground">ROI benchmark:</span>{" "}
+                {roiCategory}
+              </p>
+            ) : null}
+          </div>
+        </>
       ) : null}
-
-      <div className="flex justify-between gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          disabled={step === 0}
-          onClick={() => setStep((s) => Math.max(0, s - 1))}
-        >
-          Back
-        </Button>
-        {step < STEPS.length - 1 ? (
-          <Button
-            type="button"
-            disabled={!canNext()}
-            onClick={() => setStep((s) => s + 1)}
-          >
-            Next
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            disabled={saveMutation.isPending || !canNext()}
-            onClick={() => saveMutation.mutate()}
-          >
-            {brief ? "Convert to campaign" : "Create campaign (Draft)"}
-          </Button>
-        )}
-      </div>
-    </div>
+    </WizardShell>
   )
 }

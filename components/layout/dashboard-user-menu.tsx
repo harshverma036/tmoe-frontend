@@ -14,16 +14,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { clearAuthSession } from "@/lib/clear-auth-session"
+import { cn } from "@/lib/utils"
 
 export type DashboardUser = {
   name?: string | null
   email?: string | null
+  role?: string | null
 }
 
-/**
- * Parses the email local part (before @) and returns the first "word",
- * splitting on common separators so `john.doe@...` → `john`.
- */
+type DashboardUserMenuProps = {
+  user: DashboardUser | null
+  variant?: "avatar" | "inline"
+  roleLabel?: string
+}
+
 function getFirstWordFromEmail(email: string | undefined | null): string {
   if (!email?.trim()) return ""
   const local = email.split("@")[0] ?? ""
@@ -31,37 +35,42 @@ function getFirstWordFromEmail(email: string | undefined | null): string {
   return firstSegment ?? local
 }
 
-/**
- * Avatar label: the first word from the email local part (uppercased).
- * Long local parts are clipped so the circle stays readable.
- */
 function getAvatarMonogram(email: string | undefined | null): string {
   const word = getFirstWordFromEmail(email)
   if (!word) return "?"
   const upper = word.toUpperCase()
-  // Full word when short; first three letters when the local part is long (e.g. harshverma0362).
   return upper.length <= 4 ? upper : upper.slice(0, 3)
 }
 
-/** Single-string title case (matches prior sidebar display). */
 function formatDisplayName(name: string) {
   const t = name.trim()
   if (!t) return ""
   return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase()
 }
 
-type DashboardUserMenuProps = {
-  user: DashboardUser | null
+function getInitials(name: string, email: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+  }
+  if (parts.length === 1 && parts[0].length >= 2) {
+    return parts[0].slice(0, 2).toUpperCase()
+  }
+  return getAvatarMonogram(email)
 }
 
-export function DashboardUserMenu({ user }: DashboardUserMenuProps) {
+export function DashboardUserMenu({
+  user,
+  variant = "avatar",
+  roleLabel,
+}: DashboardUserMenuProps) {
   const router = useRouter()
 
   const displayName = user?.name?.trim()
     ? formatDisplayName(String(user.name))
     : "Account"
   const email = user?.email ?? ""
-  const monogram = getAvatarMonogram(user?.email)
+  const monogram = getInitials(displayName, email)
 
   const handleLogout = () => {
     clearAuthSession()
@@ -71,20 +80,42 @@ export function DashboardUserMenu({ user }: DashboardUserMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className={cn(
+          "rounded-xl outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          variant === "inline" &&
+            "flex items-center gap-3 border border-transparent px-1 py-1 hover:bg-muted/60"
+        )}
         aria-label="Open account menu"
       >
-        <Avatar className="size-9">
-          <AvatarFallback
-            className={
-              monogram.length > 1
-                ? "px-0.5 text-[10px] font-semibold leading-none"
-                : "text-sm font-medium"
-            }
-          >
-            {monogram}
-          </AvatarFallback>
-        </Avatar>
+        {variant === "inline" ? (
+          <>
+            <div className="hidden text-right sm:block">
+              <p className="text-sm font-medium leading-none text-foreground">
+                {displayName}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {roleLabel ?? "Account"}
+              </p>
+            </div>
+            <Avatar className="size-9 border border-border/70">
+              <AvatarFallback className="bg-[#f5ebe0] text-xs font-semibold text-foreground">
+                {monogram}
+              </AvatarFallback>
+            </Avatar>
+          </>
+        ) : (
+          <Avatar className="size-9">
+            <AvatarFallback
+              className={
+                monogram.length > 1
+                  ? "px-0.5 text-[10px] font-semibold leading-none"
+                  : "text-sm font-medium"
+              }
+            >
+              {monogram}
+            </AvatarFallback>
+          </Avatar>
+        )}
       </DropdownMenuTrigger>
 
       <DropdownMenuContent className="w-56" align="end">
@@ -102,24 +133,6 @@ export function DashboardUserMenu({ user }: DashboardUserMenuProps) {
         <DropdownMenuItem asChild>
           <Link href="/settings">Account settings</Link>
         </DropdownMenuItem>
-
-        {/* <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            Theme: {themeSummary}
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            <DropdownMenuRadioGroup
-              value={mounted ? theme : "light"}
-              onValueChange={setTheme}
-            >
-              <DropdownMenuRadioItem value="light">Light</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="dark">Dark</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="system">
-                System
-              </DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub> */}
 
         <DropdownMenuSeparator />
 

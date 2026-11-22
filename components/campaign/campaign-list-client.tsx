@@ -1,14 +1,20 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AxiosError } from "axios"
-import { Megaphone, Search } from "lucide-react"
+import { Plus } from "lucide-react"
 import toast from "react-hot-toast"
 
-import { CampaignCard } from "@/components/campaign/campaign-card"
+import { CampaignListMetrics } from "@/components/campaign/campaign-list-metrics"
+import { CampaignTable } from "@/components/campaign/campaign-table"
+import { CampaignTableSearch } from "@/components/campaign/campaign-table-search"
 import { ConfirmDialog } from "@/components/common/ConfirmDialog"
+import { FilterTabs } from "@/components/common/FilterTabs"
+import { TablePagination } from "@/components/common/TablePagination"
+import { TablePanel } from "@/components/common/TablePanel"
+import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -16,7 +22,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import {
   campaignsQueryKey,
@@ -25,11 +30,11 @@ import {
   fetchCampaigns,
 } from "@/lib/api/campaign"
 import type { Campaign, CampaignStatus } from "@/lib/campaign.types"
+import type { CampaignPublisherAssignment } from "@/lib/campaign.types"
 import { UserRole } from "@/lib/dashboard-nav"
 import { useDashboardUserRole } from "@/lib/hooks/use-dashboard-user-role"
 import { cn } from "@/lib/utils"
 import { getUserIdFromCookie } from "@/lib/user-info-cookie"
-import type { CampaignPublisherAssignment } from "@/lib/campaign.types"
 
 const PUBLISHER_ASSIGNMENT_RESPONSE_STATUSES = [
   "DRAFT",
@@ -146,6 +151,37 @@ export function CampaignListClient() {
     },
   })
 
+  const filterChips =
+    role === UserRole.PUBLISHER ? OPERATIONAL_FILTERS : BRIEF_FILTERS
+  const showOperationalFilters = role === UserRole.ADMIN
+
+  const filterTabs = useMemo(() => {
+    const chips = showOperationalFilters
+      ? [
+          ...BRIEF_FILTERS,
+          ...OPERATIONAL_FILTERS.filter(
+            (f) => f.value !== "ALL" && f.value !== "DRAFT",
+          ),
+        ]
+      : filterChips
+
+    return chips.map((chip) => ({
+      value: chip.value,
+      label: chip.label,
+      count: statusFilter === chip.value ? total : undefined,
+    }))
+  }, [showOperationalFilters, filterChips, statusFilter, total])
+
+  const assignmentPendingById = useMemo(() => {
+    if (role !== UserRole.PUBLISHER) return {}
+    return Object.fromEntries(
+      items.map((campaign) => [
+        campaign.id,
+        publisherAssignmentPending(campaign, userId),
+      ]),
+    )
+  }, [items, role, userId])
+
   if (!isReady || !role) {
     return <LoadingSkeleton variant="card-grid" cardCount={6} />
   }
@@ -158,81 +194,68 @@ export function CampaignListClient() {
     return null
   }
 
-  const filterChips =
-    role === UserRole.PUBLISHER ? OPERATIONAL_FILTERS : BRIEF_FILTERS
-  const showOperationalFilters = role === UserRole.ADMIN
+  const pageTitle =
+    role === UserRole.BRAND
+      ? "Campaigns"
+      : role === UserRole.PUBLISHER
+        ? "My Campaigns"
+        : "Campaigns"
+
+  const pageDescription =
+    role === UserRole.BRAND
+      ? "Draft a brief, refine the details, and send it for admin review when you are ready."
+      : role === UserRole.PUBLISHER
+        ? "Review assignments, accept campaigns, and track status."
+        : "Review briefs, create campaigns, assign publishers, and manage lifecycle."
+
+  const breadcrumbLabel =
+    role === UserRole.ADMIN
+      ? "TMOE Admin"
+      : role === UserRole.BRAND
+        ? "Brand Studio"
+        : "Publisher Studio"
 
   return (
-    <div className="animate-in fade-in-0 duration-500 space-y-8">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="max-w-xl space-y-1">
-          <div className="flex items-center gap-2 text-primary">
-            <Megaphone className="size-5" aria-hidden />
-            <span className="text-xs font-semibold uppercase tracking-wider">
-              Campaign studio
-            </span>
-          </div>
-          <h2 className="text-2xl font-semibold tracking-tight">
-            {role === UserRole.BRAND
-              ? "Shape your next launch"
-              : role === UserRole.PUBLISHER
-                ? "My assigned campaigns"
-                : "Campaign management"}
-          </h2>
-          <p className="text-muted-foreground text-sm leading-relaxed">
-            {role === UserRole.BRAND
-              ? "Draft a brief, refine the details, and send it for admin review when you are ready."
-              : role === UserRole.PUBLISHER
-                ? "Review assignments, accept campaigns, and track status."
-                : "Review briefs, create campaigns, assign publishers, and manage lifecycle."}
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
-          {role === UserRole.BRAND ? (
-            <Button asChild size="lg" className="shadow-sm">
-              <Link href="/campaign/new">New Campaign Brief</Link>
-            </Button>
-          ) : null}
-          {role === UserRole.ADMIN ? (
-            <Button asChild size="lg" variant="secondary" className="shadow-sm">
-              <Link href="/campaign/admin/new">Create campaign</Link>
-            </Button>
-          ) : null}
-        </div>
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        breadcrumbs={
+          <>
+            {breadcrumbLabel} <span className="mx-1.5">/</span> Campaigns
+          </>
+        }
+        title={pageTitle}
+        description={pageDescription}
+        actions={
+          <>
+            {role === UserRole.BRAND ? (
+              <Button
+                asChild
+                size="sm"
+                className="h-9 gap-2 rounded-xl px-4 shadow-none"
+              >
+                <Link href="/campaign/new">
+                  <Plus className="size-4" />
+                  New Campaign Brief
+                </Link>
+              </Button>
+            ) : null}
+            {role === UserRole.ADMIN ? (
+              <Button
+                asChild
+                size="sm"
+                className="h-9 gap-2 rounded-xl px-4 shadow-none"
+              >
+                <Link href="/campaign/admin/new">
+                  <Plus className="size-4" />
+                  Create campaign
+                </Link>
+              </Button>
+            ) : null}
+          </>
+        }
+      />
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-2">
-          {(showOperationalFilters
-            ? [...BRIEF_FILTERS, ...OPERATIONAL_FILTERS.filter((f) => f.value !== "ALL" && f.value !== "DRAFT")]
-            : filterChips
-          ).map((chip, idx) => (
-            <Button
-              key={`${chip.value}-${idx}`}
-              type="button"
-              size="sm"
-              variant={statusFilter === chip.value ? "default" : "outline"}
-              className={cn(
-                "rounded-full transition-transform duration-200",
-                statusFilter === chip.value && "shadow-sm",
-              )}
-              onClick={() => setStatusFilter(chip.value)}
-            >
-              {chip.label}
-            </Button>
-          ))}
-        </div>
-        <div className="relative max-w-md flex-1">
-          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by brief name…"
-            className="pl-9"
-            aria-label="Search campaigns"
-          />
-        </div>
-      </div>
+      <CampaignListMetrics items={items} total={total} role={role} />
 
       {isError ? (
         <Card className="border-destructive/40 bg-destructive/5">
@@ -254,9 +277,9 @@ export function CampaignListClient() {
         </Card>
       ) : null}
 
-      {isFetching && !items.length ? (
-        <LoadingSkeleton variant="card-grid" cardCount={6} />
-      ) : !items.length && !isFetching ? (
+      {!isError && isFetching && !items.length ? (
+        <LoadingSkeleton variant="card-grid" cardCount={4} />
+      ) : !isError && !items.length && !isFetching ? (
         <Card
           className={cn(
             "overflow-hidden border-dashed",
@@ -277,56 +300,50 @@ export function CampaignListClient() {
             ) : null}
           </CardHeader>
         </Card>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {items.map((c, i) => (
-              <CampaignCard
-                key={c.id}
-                campaign={c}
-                index={i}
-                role={role}
-                assignmentPending={
-                  role === UserRole.PUBLISHER
-                    ? publisherAssignmentPending(c, userId)
-                    : false
-                }
-                onDelete={
-                  c.status === "DRAFT" &&
-                  (role === UserRole.BRAND || role === UserRole.ADMIN)
-                    ? () => setDeleteTarget(c)
-                    : undefined
-                }
+      ) : !isError ? (
+        <TablePanel
+          toolbar={
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <FilterTabs
+                tabs={filterTabs}
+                value={statusFilter}
+                onChange={setStatusFilter}
               />
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
-            <p className="text-muted-foreground text-xs tabular-nums">
-              Showing {skip + 1}–{skip + items.length} of {total}
-            </p>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={skip === 0 || isFetching}
-                onClick={() => setSkip((s) => Math.max(0, s - PAGE_SIZE))}
-              >
-                Previous
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!hasMore || isFetching}
-                onClick={() => setSkip((s) => s + PAGE_SIZE)}
-              >
-                Next
-              </Button>
+              <CampaignTableSearch
+                value={search}
+                onChange={setSearch}
+                placeholder="Search by brief name…"
+              />
             </div>
-          </div>
-        </>
-      )}
+          }
+          footer={
+            <TablePagination
+              showingFrom={total === 0 ? 0 : skip + 1}
+              showingTo={skip + items.length}
+              total={total}
+              hasPrevious={skip > 0}
+              hasNext={hasMore}
+              isLoading={isFetching}
+              onPrevious={() =>
+                setSkip((current) => Math.max(0, current - PAGE_SIZE))
+              }
+              onNext={() => setSkip((current) => current + PAGE_SIZE)}
+            />
+          }
+        >
+          <CampaignTable
+            items={items}
+            role={role}
+            isLoading={isFetching}
+            assignmentPendingById={assignmentPendingById}
+            onDelete={
+              role === UserRole.BRAND || role === UserRole.ADMIN
+                ? (campaign) => setDeleteTarget(campaign)
+                : undefined
+            }
+          />
+        </TablePanel>
+      ) : null}
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}

@@ -14,6 +14,7 @@ type SkuTagInputProps = {
   error?: string
   disabled?: boolean
   placeholder?: string
+  label?: string
 }
 
 export function SkuTagInput({
@@ -23,6 +24,7 @@ export function SkuTagInput({
   error,
   disabled,
   placeholder = "Type a SKU or product name, then press Enter",
+  label = "Product SKUs",
 }: SkuTagInputProps) {
   const [draft, setDraft] = useState("")
 
@@ -44,7 +46,7 @@ export function SkuTagInput({
   return (
     <div className="grid w-full gap-2">
       <Label htmlFor={id} className={cn(error && "text-destructive")}>
-        Product SKUs
+        {label}
       </Label>
       <div
         className={cn(

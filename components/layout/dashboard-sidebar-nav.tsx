@@ -10,7 +10,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import {
-  dashboardNavMatchesPath,
+  getActiveNavHref,
   getDashboardNavItemsForRole,
 } from "@/lib/dashboard-nav"
 import { cn } from "@/lib/utils"
@@ -22,13 +22,14 @@ export function DashboardSidebarNav({
 }) {
   const pathname = usePathname()
   const navItems = getDashboardNavItemsForRole(userRole)
+  const activeHref = getActiveNavHref(pathname, navItems)
 
   return (
     <SidebarContent className="gap-0 px-3 py-5">
       <SidebarMenu className="gap-2">
         {navItems.map((item) => {
           const Icon = item.icon
-          const active = dashboardNavMatchesPath(pathname, item.href)
+          const active = item.href === activeHref
           return (
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
