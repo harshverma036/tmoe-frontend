@@ -29,6 +29,12 @@ const rupeeFormat = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 2,
 })
 
+const percentFormat = new Intl.NumberFormat("en-IN", {
+  style: "percent",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+
 /** How the report shows a value; null and blank become an em dash. */
 export function formatReportValue(
   value: string | number | null | undefined,
@@ -40,6 +46,8 @@ export function formatReportValue(
       return typeof value === "number" ? rupeeFormat.format(value) : String(value)
     case "number":
       return typeof value === "number" ? numberFormat.format(value) : String(value)
+    case "percent":
+      return typeof value === "number" ? percentFormat.format(value) : String(value)
     case "date": {
       // parseISO reads YYYY-MM-DD as a local date, so the day never shifts back west of UTC.
       const date = parseISO(String(value))
@@ -100,7 +108,9 @@ export function ReportTableSection({ table, rangeLabel }: ReportTableSectionProp
         cell: ({ row }: { row: { original: DisplayRow } }) => {
           const text = formatReportValue(row.original.cells[column.key], column.format)
           if (text === "—") return <span className="text-muted-foreground">—</span>
-          const numeric = column.format === "number" || column.format === "inr"
+          const numeric = column.format === "number" ||
+            column.format === "inr" ||
+            column.format === "percent"
           return <span className={numeric ? "tabular-nums" : undefined}>{text}</span>
         },
       })),

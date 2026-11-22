@@ -14,8 +14,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   deletePlacementMedia,
   fetchPlacementMedia,
+  PLACEMENT_CHANNELS,
   placementMediaQueryKey,
   uploadPlacementMedia,
+  type PlacementChannel,
   type PlacementMediaItem,
 } from "@/lib/api/placement-media"
 import {
@@ -56,7 +58,6 @@ export function CampaignContentPlacementSection({
   role,
 }: CampaignContentPlacementSectionProps) {
   const queryClient = useQueryClient()
-  const inputRef = useRef<HTMLInputElement>(null)
   const [pendingDelete, setPendingDelete] = useState<PlacementMediaItem | null>(
     null,
   )
@@ -66,25 +67,25 @@ export function CampaignContentPlacementSection({
 
   const mediaQuery = useQuery({
     queryKey: placementMediaQueryKey(campaignId),
-    queryFn: () => fetchPlacementMedia(campaignId, { limit: 50, skip: 0 }),
+    queryFn: () => fetchPlacementMedia(campaignId, { limit: 200, skip: 0 }),
     enabled: Boolean(campaignId),
   })
 
   const uploadMutation = useMutation({
-    mutationFn: (files: File[]) => uploadPlacementMedia(campaignId, files),
+    mutationFn: ({ files, channel }: { files: File[]; channel: PlacementChannel }) =>
+      uploadPlacementMedia(campaignId, files, channel),
     onSuccess: (uploaded) => {
       toast.success(
         uploaded.length === 1
-          ? "Image uploaded"
-          : `${uploaded.length} images uploaded`,
+          ? "Screenshot uploaded"
+          : `${uploaded.length} screenshots uploaded`,
       )
       void queryClient.invalidateQueries({
         queryKey: placementMediaQueryKey(campaignId),
       })
-      if (inputRef.current) inputRef.current.value = ""
     },
     onError: (error) => {
-      toast.error(errorMessage(error, "Failed to upload images"))
+      toast.error(errorMessage(error, "Failed to upload screenshots"))
     },
   })
 
@@ -92,30 +93,19 @@ export function CampaignContentPlacementSection({
     mutationFn: (mediaId: string) =>
       deletePlacementMedia(campaignId, mediaId),
     onSuccess: () => {
-      toast.success("Image removed")
+      toast.success("Screenshot removed")
       setPendingDelete(null)
       void queryClient.invalidateQueries({
         queryKey: placementMediaQueryKey(campaignId),
       })
     },
     onError: (error) => {
-      toast.error(errorMessage(error, "Failed to remove image"))
+      toast.error(errorMessage(error, "Failed to remove screenshot"))
     },
   })
 
   const items = mediaQuery.data?.data ?? []
-
-  function onFilesSelected(fileList: FileList | null) {
-    if (!fileList || fileList.length === 0) return
-    const files = Array.from(fileList).filter((f) =>
-      f.type.toLowerCase().startsWith("image/"),
-    )
-    if (files.length === 0) {
-      toast.error("Please select image files only")
-      return
-    }
-    uploadMutation.mutate(files)
-  }
+  const untagged = items.filter((item) => item.channel === null)
 
   function canDelete(item: PlacementMediaItem) {
     if (role === UserRole.ADMIN) return true
@@ -165,142 +155,76 @@ export function CampaignContentPlacementSection({
             </CardTitle>
             <p className="text-muted-foreground text-sm">
               The brand did not choose a content placement when creating this
-              campaign brief. You can still upload placement images below.
+              campaign brief. You can still upload placement screenshots below.
             </p>
           </CardHeader>
         </Card>
       )}
 
-      <Card>
-        <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
-          <div className="space-y-1">
-            <CardTitle className="text-base">Placement images</CardTitle>
-            <p className="text-muted-foreground text-sm">
-              {canUpload
-                ? "Upload one or more images for this content placement. Files are stored securely and listed only on this tab."
-                : "Images uploaded for this campaign’s content placement."}
-            </p>
+      <section className="space-y-4" aria-label="Placement screenshots">
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold">Placement screenshots</h3>
+          <p className="text-muted-foreground text-sm">
+            {canUpload
+              ? "Upload screenshots showing where this campaign’s content appeared, under each placement."
+              : "Screenshots showing where this campaign’s content appeared."}
+          </p>
+        </div>
+
+        {mediaQuery.isLoading ? (
+          <div className="text-muted-foreground flex items-center gap-2 text-sm">
+            <Loader2 className="size-4 animate-spin" />
+            Loading screenshots…
           </div>
-          {canUpload ? (
-            <div>
-              <input
-                ref={inputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
-                multiple
-                className="hidden"
-                onChange={(e) => onFilesSelected(e.target.files)}
+        ) : mediaQuery.isError ? (
+          <p className="text-destructive text-sm">
+            {errorMessage(mediaQuery.error, "Failed to load placement screenshots")}
+          </p>
+        ) : (
+          <div className="grid gap-4 xl:grid-cols-2">
+            {PLACEMENT_CHANNELS.map((channel) => (
+              <PlacementChannelCard
+                key={channel.value}
+                title={channel.label}
+                description={channel.description}
+                items={items.filter((item) => item.channel === channel.value)}
+                canUpload={canUpload}
+                isUploading={
+                  uploadMutation.isPending &&
+                  uploadMutation.variables?.channel === channel.value
+                }
+                uploadDisabled={uploadMutation.isPending}
+                onUpload={(files) =>
+                  uploadMutation.mutate({ files, channel: channel.value })
+                }
+                canDelete={canDelete}
+                onRemove={setPendingDelete}
               />
-              <Button
-                type="button"
-                size="sm"
-                disabled={uploadMutation.isPending}
-                onClick={() => inputRef.current?.click()}
-              >
-                {uploadMutation.isPending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Upload className="size-4" />
-                )}
-                Upload images
-              </Button>
-            </div>
-          ) : null}
-        </CardHeader>
-        <CardContent>
-          {mediaQuery.isLoading ? (
-            <div className="text-muted-foreground flex items-center gap-2 text-sm">
-              <Loader2 className="size-4 animate-spin" />
-              Loading images…
-            </div>
-          ) : mediaQuery.isError ? (
-            <p className="text-destructive text-sm">
-              {errorMessage(mediaQuery.error, "Failed to load placement images")}
-            </p>
-          ) : items.length === 0 ? (
-            <div className="border-muted-foreground/25 flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-10 text-center">
-              <ImagePlus className="text-muted-foreground size-8" />
-              <p className="text-sm font-medium">No placement images yet</p>
-              <p className="text-muted-foreground max-w-sm text-sm">
-                {canUpload
-                  ? "Upload creative assets that belong in this placement zone."
-                  : "No images have been uploaded for this placement."}
-              </p>
-              {canUpload ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-2"
-                  disabled={uploadMutation.isPending}
-                  onClick={() => inputRef.current?.click()}
-                >
-                  <Upload className="size-4" />
-                  Choose images
-                </Button>
-              ) : null}
-            </div>
-          ) : (
-            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {items.map((item) => (
-                <li
-                  key={item.id}
-                  className={cn(
-                    "bg-muted/30 group relative overflow-hidden rounded-lg border",
-                  )}
-                >
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block aspect-4/3 overflow-hidden bg-black/5"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={item.url}
-                      alt={item.file_name || "Placement image"}
-                      className="size-full object-cover transition group-hover:scale-[1.02]"
-                    />
-                  </a>
-                  <div className="space-y-1 p-3">
-                    <p className="truncate text-sm font-medium">
-                      {item.file_name || "Untitled image"}
-                    </p>
-                    <p className="text-muted-foreground truncate text-xs">
-                      {item.uploaded_by?.name ||
-                        item.uploaded_by?.email ||
-                        "Unknown uploader"}
-                      {fmtDate(item.created_at)
-                        ? ` · ${fmtDate(item.created_at)}`
-                        : ""}
-                    </p>
-                    {canDelete(item) ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive -ml-2 h-8 px-2"
-                        onClick={() => setPendingDelete(item)}
-                      >
-                        <Trash2 className="size-3.5" />
-                        Remove
-                      </Button>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+            ))}
+            {untagged.length > 0 ? (
+              <PlacementChannelCard
+                title="Other images"
+                description="Uploaded before placements were split by channel."
+                items={untagged}
+                canUpload={false}
+                isUploading={false}
+                uploadDisabled
+                onUpload={() => undefined}
+                canDelete={canDelete}
+                onRemove={setPendingDelete}
+              />
+            ) : null}
+          </div>
+        )}
+      </section>
 
       <ConfirmDialog
         open={Boolean(pendingDelete)}
         onOpenChange={(open) => {
           if (!open) setPendingDelete(null)
         }}
-        title="Remove placement image?"
-        description="This removes the image from the campaign placement list. This cannot be undone from the UI."
+        title="Remove placement screenshot?"
+        description="This removes the screenshot from the campaign’s placements. This cannot be undone from the UI."
         confirmLabel="Remove"
         confirmVariant="destructive"
         isPending={deleteMutation.isPending}
@@ -309,5 +233,166 @@ export function CampaignContentPlacementSection({
         }}
       />
     </div>
+  )
+}
+
+type PlacementChannelCardProps = {
+  title: string
+  description: string
+  items: PlacementMediaItem[]
+  canUpload: boolean
+  /** This card's upload is in flight. */
+  isUploading: boolean
+  /** Any upload is in flight; one at a time keeps the toasts and refreshes simple. */
+  uploadDisabled: boolean
+  onUpload: (files: File[]) => void
+  canDelete: (item: PlacementMediaItem) => boolean
+  onRemove: (item: PlacementMediaItem) => void
+}
+
+/** One placement channel: its upload button and its screenshots. */
+function PlacementChannelCard({
+  title,
+  description,
+  items,
+  canUpload,
+  isUploading,
+  uploadDisabled,
+  onUpload,
+  canDelete,
+  onRemove,
+}: PlacementChannelCardProps) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  function onFilesSelected(fileList: FileList | null) {
+    if (!fileList || fileList.length === 0) return
+    const files = Array.from(fileList).filter((f) =>
+      f.type.toLowerCase().startsWith("image/"),
+    )
+    if (inputRef.current) inputRef.current.value = ""
+    if (files.length === 0) {
+      toast.error("Please select image files only")
+      return
+    }
+    onUpload(files)
+  }
+
+  const chooseFiles = () => inputRef.current?.click()
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
+        <div className="min-w-0 space-y-1">
+          <CardTitle className="text-base">
+            {title}
+            <span className="text-muted-foreground ml-2 text-sm font-normal tabular-nums">
+              {items.length}
+            </span>
+          </CardTitle>
+          <p className="text-muted-foreground text-sm">{description}</p>
+        </div>
+        {canUpload ? (
+          <div>
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+              multiple
+              className="hidden"
+              aria-label={`Upload ${title} screenshots`}
+              onChange={(e) => onFilesSelected(e.target.files)}
+            />
+            <Button
+              type="button"
+              size="sm"
+              disabled={uploadDisabled}
+              onClick={chooseFiles}
+            >
+              {isUploading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Upload className="size-4" />
+              )}
+              Upload
+            </Button>
+          </div>
+        ) : null}
+      </CardHeader>
+      <CardContent>
+        {items.length === 0 ? (
+          <div className="border-muted-foreground/25 flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-8 text-center">
+            <ImagePlus className="text-muted-foreground size-7" />
+            <p className="text-muted-foreground text-sm">
+              {canUpload
+                ? `No ${title} screenshots yet.`
+                : `No ${title} screenshots have been uploaded.`}
+            </p>
+            {canUpload ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-1"
+                disabled={uploadDisabled}
+                onClick={chooseFiles}
+              >
+                <Upload className="size-4" />
+                Choose images
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <ul className="grid gap-4 sm:grid-cols-2">
+            {items.map((item) => (
+              <li
+                key={item.id}
+                className={cn(
+                  "bg-muted/30 group relative overflow-hidden rounded-lg border",
+                )}
+              >
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block aspect-4/3 overflow-hidden bg-black/5"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={item.url}
+                    alt={item.file_name || `${title} screenshot`}
+                    className="size-full object-cover object-top transition group-hover:scale-[1.02]"
+                  />
+                </a>
+                <div className="space-y-1 p-3">
+                  <p className="truncate text-sm font-medium">
+                    {item.file_name || "Untitled image"}
+                  </p>
+                  <p className="text-muted-foreground truncate text-xs">
+                    {item.uploaded_by?.name ||
+                      item.uploaded_by?.email ||
+                      "Unknown uploader"}
+                    {fmtDate(item.created_at)
+                      ? ` · ${fmtDate(item.created_at)}`
+                      : ""}
+                  </p>
+                  {canDelete(item) ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive -ml-2 h-8 px-2"
+                      onClick={() => onRemove(item)}
+                    >
+                      <Trash2 className="size-3.5" />
+                      Remove
+                    </Button>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   )
 }

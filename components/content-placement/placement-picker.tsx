@@ -3,6 +3,7 @@
 import {
   AlignCenter,
   ArrowDownToLine,
+  BellRing,
   Check,
   FileText,
   Grid3x3,
@@ -10,7 +11,10 @@ import {
   PanelBottom,
   PanelLeft,
   PanelRight,
+  Search,
   Sidebar,
+  Smartphone,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react"
 
@@ -18,6 +22,7 @@ import { PlacementVisualizer } from "@/components/content-placement/placement-vi
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import {
+  CONTENT_PLACEMENT_GROUPS,
   CONTENT_PLACEMENT_POSITIONS,
   getPlacementLabel,
   type ContentPlacementPosition,
@@ -39,6 +44,10 @@ const POSITION_ICONS: Record<ContentPlacementPosition, LucideIcon> = {
   SIDEBAR: Sidebar,
   CATEGORY_PAGE: Grid3x3,
   FOOTER: PanelBottom,
+  GOOGLE: Search,
+  AEO: Sparkles,
+  PUSH_NOTIFICATION: BellRing,
+  IN_APP: Smartphone,
 }
 
 export function PlacementPicker({ value, onChange, disabled }: PlacementPickerProps) {
@@ -66,56 +75,67 @@ export function PlacementPicker({ value, onChange, disabled }: PlacementPickerPr
       <div className="min-w-0">
         <p className="mb-3 text-sm font-semibold">Choose position</p>
         <div
-          className="grid max-h-[min(72vh,640px)] gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2"
+          className="max-h-[min(72vh,640px)] space-y-5 overflow-y-auto pr-1"
           role="radiogroup"
           aria-label="Content placement position"
         >
-          {CONTENT_PLACEMENT_POSITIONS.map((option) => {
-            const selected = value === option.value
-            const Icon = POSITION_ICONS[option.value]
+          {CONTENT_PLACEMENT_GROUPS.map((group) => (
+            <div key={group.value} className="space-y-2">
+              <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                {group.label}
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                {CONTENT_PLACEMENT_POSITIONS.filter(
+                  (option) => option.group === group.value,
+                ).map((option) => {
+                  const selected = value === option.value
+                  const Icon = POSITION_ICONS[option.value]
 
-            return (
-              <button
-                key={option.value}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                disabled={disabled}
-                onClick={() => onChange(option.value)}
-                className={cn(
-                  "group flex items-start gap-3 rounded-xl border p-3.5 text-left transition-all",
-                  selected
-                    ? "border-primary bg-primary/8 shadow-sm ring-1 ring-primary/25"
-                    : "border-border/80 bg-card hover:border-primary/35 hover:bg-muted/30",
-                  disabled && "pointer-events-none opacity-60",
-                )}
-              >
-                <div
-                  className={cn(
-                    "flex size-10 shrink-0 items-center justify-center rounded-lg border transition-colors",
-                    selected
-                      ? "border-primary/40 bg-primary/15 text-primary"
-                      : "border-border bg-muted/50 text-muted-foreground group-hover:border-primary/30 group-hover:text-primary",
-                  )}
-                >
-                  <Icon className="size-5" aria-hidden />
-                </div>
-                <div className="min-w-0 flex-1 pt-0.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm leading-snug font-medium">{option.label}</p>
-                    {selected ? (
-                      <span className="bg-primary text-primary-foreground flex size-5 shrink-0 items-center justify-center rounded-full">
-                        <Check className="size-3" strokeWidth={3} aria-hidden />
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-                    {option.description}
-                  </p>
-                </div>
-              </button>
-            )
-          })}
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      disabled={disabled}
+                      onClick={() => onChange(option.value)}
+                      className={cn(
+                        "group flex items-start gap-3 rounded-xl border p-3.5 text-left transition-all",
+                        selected
+                          ? "border-primary bg-primary/8 shadow-sm ring-1 ring-primary/25"
+                          : "border-border/80 bg-card hover:border-primary/35 hover:bg-muted/30",
+                        disabled && "pointer-events-none opacity-60",
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "flex size-10 shrink-0 items-center justify-center rounded-lg border transition-colors",
+                          selected
+                            ? "border-primary/40 bg-primary/15 text-primary"
+                            : "border-border bg-muted/50 text-muted-foreground group-hover:border-primary/30 group-hover:text-primary",
+                        )}
+                      >
+                        <Icon className="size-5" aria-hidden />
+                      </div>
+                      <div className="min-w-0 flex-1 pt-0.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm leading-snug font-medium">{option.label}</p>
+                          {selected ? (
+                            <span className="bg-primary text-primary-foreground flex size-5 shrink-0 items-center justify-center rounded-full">
+                              <Check className="size-3" strokeWidth={3} aria-hidden />
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                          {option.description}
+                        </p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

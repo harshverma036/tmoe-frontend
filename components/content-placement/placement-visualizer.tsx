@@ -1,7 +1,11 @@
 "use client"
 
+import { ChannelPreview } from "@/components/content-placement/channel-preview"
 import { cn } from "@/lib/utils"
-import type { ContentPlacementPosition } from "@/lib/content-placement.types"
+import {
+  isChannelPlacement,
+  type ContentPlacementPosition,
+} from "@/lib/content-placement.types"
 
 type PlacementVisualizerProps = {
   position: ContentPlacementPosition | null | undefined
@@ -45,6 +49,12 @@ export function PlacementVisualizer({
 }: PlacementVisualizerProps) {
   const p = position ?? null
   const isLg = size === "lg"
+
+  if (p && isChannelPlacement(p)) {
+    return (
+      <ChannelPreview channel={p} size={size} emphasized={emphasized} className={className} />
+    )
+  }
 
   return (
     <div

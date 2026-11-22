@@ -161,10 +161,11 @@ export default function ConfigureContentPlacementPage() {
 
       <Card className="border-border/70 shadow-sm">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">On-site position</CardTitle>
+          <CardTitle className="text-base">Position</CardTitle>
           <CardDescription>
-            Pick where branded content should render. The live preview updates as you
-            select each option.
+            Pick where branded content should appear: a spot on the publisher&apos;s page, or a
+            distribution channel (Google, AEO, push notification, in app). The live preview
+            updates as you select each option.
             {position ? (
               <>
                 {" "}

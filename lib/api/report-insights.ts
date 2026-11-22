@@ -4,8 +4,8 @@ import type {
   ReportSyncStatus,
 } from "@/lib/report-source.types"
 
-/** How to show a value: `inr` is rupees, `date` is `YYYY-MM-DD`. */
-export type ReportValueFormat = "date" | "text" | "number" | "inr"
+/** How to show a value: `inr` is rupees, `date` is `YYYY-MM-DD`, `percent` is a fraction (0.02 = 2%). */
+export type ReportValueFormat = "date" | "text" | "number" | "inr" | "percent"
 
 export type ReportInsightColumn = {
   key: string
