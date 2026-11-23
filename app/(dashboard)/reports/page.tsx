@@ -7,6 +7,7 @@ import { AxiosError } from "axios"
 import { RefreshCw } from "lucide-react"
 
 import { PageHeader } from "@/components/layout/page-header"
+import { BrandReports } from "@/components/reports/brand-reports"
 import { ImpactProgramReport } from "@/components/reports/impact-program-report"
 import { ReportRangeFilter } from "@/components/reports/report-range-filter"
 import {
@@ -111,12 +112,16 @@ export default function ReportsPage() {
     return <LoadingSkeleton className="h-48 w-full" />
   }
 
+  if (role === UserRole.BRAND) {
+    return <BrandReports />
+  }
+
   if (role !== UserRole.ADMIN) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Reports</CardTitle>
-          <CardDescription>Reports are available to admins only.</CardDescription>
+          <CardDescription>Reports are available to admins and brands only.</CardDescription>
         </CardHeader>
       </Card>
     )

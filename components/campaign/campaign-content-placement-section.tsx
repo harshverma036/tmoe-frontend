@@ -4,19 +4,25 @@ import { useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AxiosError } from "axios"
 import { format, parseISO } from "date-fns"
-import { ImagePlus, Loader2, Trash2, Upload } from "lucide-react"
+import { ImagePlus, Loader2, Maximize2, Play, Trash2, Upload } from "lucide-react"
 import toast from "react-hot-toast"
 
 import { PlacementVisualizer } from "@/components/content-placement/placement-visualizer"
 import { ConfirmDialog } from "@/components/common/ConfirmDialog"
+import { MediaLightbox } from "@/components/common/media-lightbox"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   deletePlacementMedia,
-  fetchPlacementMedia,
+  fetchAllPlacementMedia,
+  IMAGE_ACCEPT,
+  isVideoMedia,
+  MAX_IMAGE_MB,
+  MAX_VIDEO_MB,
   PLACEMENT_CHANNELS,
   placementMediaQueryKey,
   uploadPlacementMedia,
+  VIDEO_ACCEPT,
   type PlacementChannel,
   type PlacementMediaItem,
 } from "@/lib/api/placement-media"
@@ -67,25 +73,37 @@ export function CampaignContentPlacementSection({
 
   const mediaQuery = useQuery({
     queryKey: placementMediaQueryKey(campaignId),
-    queryFn: () => fetchPlacementMedia(campaignId, { limit: 200, skip: 0 }),
+    queryFn: () => fetchAllPlacementMedia(campaignId),
     enabled: Boolean(campaignId),
   })
 
+  // Files sent so far of the upload in flight, for the button's "Uploading 12/40".
+  const [uploadProgress, setUploadProgress] = useState<{
+    done: number
+    total: number
+  } | null>(null)
+
   const uploadMutation = useMutation({
-    mutationFn: ({ files, channel }: { files: File[]; channel: PlacementChannel }) =>
-      uploadPlacementMedia(campaignId, files, channel),
+    mutationFn: ({ files, channel }: { files: File[]; channel: PlacementChannel }) => {
+      setUploadProgress({ done: 0, total: files.length })
+      return uploadPlacementMedia(campaignId, files, channel, (done, total) =>
+        setUploadProgress({ done, total }),
+      )
+    },
     onSuccess: (uploaded) => {
       toast.success(
-        uploaded.length === 1
-          ? "Screenshot uploaded"
-          : `${uploaded.length} screenshots uploaded`,
+        uploaded.length === 1 ? "1 file uploaded" : `${uploaded.length} files uploaded`,
       )
+    },
+    onError: (error) => {
+      toast.error(errorMessage(error, "Failed to upload files"))
+    },
+    // Earlier batches of a failed upload are saved, so refresh either way.
+    onSettled: () => {
+      setUploadProgress(null)
       void queryClient.invalidateQueries({
         queryKey: placementMediaQueryKey(campaignId),
       })
-    },
-    onError: (error) => {
-      toast.error(errorMessage(error, "Failed to upload screenshots"))
     },
   })
 
@@ -166,8 +184,8 @@ export function CampaignContentPlacementSection({
           <h3 className="text-base font-semibold">Placement screenshots</h3>
           <p className="text-muted-foreground text-sm">
             {canUpload
-              ? "Upload screenshots showing where this campaign’s content appeared, under each placement."
-              : "Screenshots showing where this campaign’s content appeared."}
+              ? "Upload as many screenshots as you need showing where this campaign’s content appeared, under each placement. The news feed also takes videos. Click any image to see it full size."
+              : "Screenshots showing where this campaign’s content appeared. Click any image to see it full size."}
           </p>
         </div>
 
@@ -187,11 +205,14 @@ export function CampaignContentPlacementSection({
                 key={channel.value}
                 title={channel.label}
                 description={channel.description}
+                acceptsVideo={channel.acceptsVideo === true}
                 items={items.filter((item) => item.channel === channel.value)}
                 canUpload={canUpload}
-                isUploading={
+                uploadProgress={
                   uploadMutation.isPending &&
                   uploadMutation.variables?.channel === channel.value
+                    ? uploadProgress
+                    : null
                 }
                 uploadDisabled={uploadMutation.isPending}
                 onUpload={(files) =>
@@ -206,8 +227,9 @@ export function CampaignContentPlacementSection({
                 title="Other images"
                 description="Uploaded before placements were split by channel."
                 items={untagged}
+                acceptsVideo={false}
                 canUpload={false}
-                isUploading={false}
+                uploadProgress={null}
                 uploadDisabled
                 onUpload={() => undefined}
                 canDelete={canDelete}
@@ -223,8 +245,12 @@ export function CampaignContentPlacementSection({
         onOpenChange={(open) => {
           if (!open) setPendingDelete(null)
         }}
-        title="Remove placement screenshot?"
-        description="This removes the screenshot from the campaign’s placements. This cannot be undone from the UI."
+        title={
+          pendingDelete && isVideoMedia(pendingDelete)
+            ? "Remove placement video?"
+            : "Remove placement screenshot?"
+        }
+        description="This removes the file from the campaign’s placements. This cannot be undone from the UI."
         confirmLabel="Remove"
         confirmVariant="destructive"
         isPending={deleteMutation.isPending}
@@ -239,10 +265,12 @@ export function CampaignContentPlacementSection({
 type PlacementChannelCardProps = {
   title: string
   description: string
+  /** Takes videos as well as screenshots (the news feed). */
+  acceptsVideo: boolean
   items: PlacementMediaItem[]
   canUpload: boolean
-  /** This card's upload is in flight. */
-  isUploading: boolean
+  /** This card's upload in flight, files sent so far; null when none. */
+  uploadProgress: { done: number; total: number } | null
   /** Any upload is in flight; one at a time keeps the toasts and refreshes simple. */
   uploadDisabled: boolean
   onUpload: (files: File[]) => void
@@ -250,31 +278,51 @@ type PlacementChannelCardProps = {
   onRemove: (item: PlacementMediaItem) => void
 }
 
-/** One placement channel: its upload button and its screenshots. */
+/** One placement channel: its upload button and its screenshots (and videos). */
 function PlacementChannelCard({
   title,
   description,
+  acceptsVideo,
   items,
   canUpload,
-  isUploading,
+  uploadProgress,
   uploadDisabled,
   onUpload,
   canDelete,
   onRemove,
 }: PlacementChannelCardProps) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const [viewing, setViewing] = useState<number | null>(null)
+  const isUploading = uploadProgress !== null
+  const noun = acceptsVideo ? "screenshots or videos" : "screenshots"
 
   function onFilesSelected(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return
-    const files = Array.from(fileList).filter((f) =>
-      f.type.toLowerCase().startsWith("image/"),
-    )
+    const picked = Array.from(fileList)
     if (inputRef.current) inputRef.current.value = ""
-    if (files.length === 0) {
-      toast.error("Please select image files only")
-      return
+
+    const isVideo = (f: File) => f.type.toLowerCase().startsWith("video/")
+    const supported = picked.filter(
+      (f) => f.type.toLowerCase().startsWith("image/") || (acceptsVideo && isVideo(f)),
+    )
+    const tooLarge = supported.filter(
+      (f) => f.size > (isVideo(f) ? MAX_VIDEO_MB : MAX_IMAGE_MB) * 1024 * 1024,
+    )
+    const files = supported.filter((f) => !tooLarge.includes(f))
+
+    if (supported.length < picked.length) {
+      toast.error(
+        acceptsVideo
+          ? "Some files were skipped: only images and MP4, WebM or MOV videos can be added."
+          : "Some files were skipped: only images can be added here.",
+      )
     }
-    onUpload(files)
+    if (tooLarge.length > 0) {
+      toast.error(
+        `${tooLarge.length === 1 ? `"${tooLarge[0].name}" is` : `${tooLarge.length} files are`} too large (images up to ${MAX_IMAGE_MB}MB${acceptsVideo ? `, videos up to ${MAX_VIDEO_MB}MB` : ""}).`,
+      )
+    }
+    if (files.length > 0) onUpload(files)
   }
 
   const chooseFiles = () => inputRef.current?.click()
@@ -296,10 +344,10 @@ function PlacementChannelCard({
             <input
               ref={inputRef}
               type="file"
-              accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+              accept={acceptsVideo ? `${IMAGE_ACCEPT},${VIDEO_ACCEPT}` : IMAGE_ACCEPT}
               multiple
               className="hidden"
-              aria-label={`Upload ${title} screenshots`}
+              aria-label={`Upload ${title} ${noun}`}
               onChange={(e) => onFilesSelected(e.target.files)}
             />
             <Button
@@ -313,7 +361,13 @@ function PlacementChannelCard({
               ) : (
                 <Upload className="size-4" />
               )}
-              Upload
+              {uploadProgress && uploadProgress.total > 1
+                ? `Uploading ${uploadProgress.done}/${uploadProgress.total}`
+                : isUploading
+                  ? "Uploading…"
+                  : items.length > 0
+                    ? "Add more"
+                    : "Upload"}
             </Button>
           </div>
         ) : null}
@@ -324,8 +378,8 @@ function PlacementChannelCard({
             <ImagePlus className="text-muted-foreground size-7" />
             <p className="text-muted-foreground text-sm">
               {canUpload
-                ? `No ${title} screenshots yet.`
-                : `No ${title} screenshots have been uploaded.`}
+                ? `No ${title} ${noun} yet. You can add as many as you need.`
+                : `No ${title} ${noun} have been uploaded.`}
             </p>
             {canUpload ? (
               <Button
@@ -337,32 +391,52 @@ function PlacementChannelCard({
                 onClick={chooseFiles}
               >
                 <Upload className="size-4" />
-                Choose images
+                {acceptsVideo ? "Choose images or videos" : "Choose images"}
               </Button>
             ) : null}
           </div>
         ) : (
           <ul className="grid gap-4 sm:grid-cols-2">
-            {items.map((item) => (
+            {items.map((item, index) => (
               <li
                 key={item.id}
                 className={cn(
                   "bg-muted/30 group relative overflow-hidden rounded-lg border",
                 )}
               >
-                <a
-                  href={item.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block aspect-4/3 overflow-hidden bg-black/5"
+                <button
+                  type="button"
+                  onClick={() => setViewing(index)}
+                  className="relative block aspect-4/3 w-full cursor-zoom-in overflow-hidden bg-black/5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={`View ${item.file_name || `${title} file`} full size`}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={item.url}
-                    alt={item.file_name || `${title} screenshot`}
-                    className="size-full object-cover object-top transition group-hover:scale-[1.02]"
-                  />
-                </a>
+                  {isVideoMedia(item) ? (
+                    <>
+                      <video
+                        src={`${item.url}#t=0.1`}
+                        muted
+                        playsInline
+                        preload="metadata"
+                        className="pointer-events-none size-full bg-black object-cover"
+                      />
+                      <span className="absolute inset-0 flex items-center justify-center">
+                        <span className="flex size-12 items-center justify-center rounded-full bg-black/60 text-white">
+                          <Play className="size-5 translate-x-px fill-current" />
+                        </span>
+                      </span>
+                    </>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={item.url}
+                      alt={item.file_name || `${title} screenshot`}
+                      className="size-full object-cover object-top transition group-hover:scale-[1.02]"
+                    />
+                  )}
+                  <span className="absolute top-2 right-2 flex size-7 items-center justify-center rounded-md bg-black/55 text-white opacity-0 transition group-hover:opacity-100">
+                    <Maximize2 className="size-3.5" />
+                  </span>
+                </button>
                 <div className="space-y-1 p-3">
                   <p className="truncate text-sm font-medium">
                     {item.file_name || "Untitled image"}
@@ -392,6 +466,23 @@ function PlacementChannelCard({
             ))}
           </ul>
         )}
+        <MediaLightbox
+          items={items.map((item) => ({
+            id: item.id,
+            url: item.url,
+            title: item.file_name || `${title} ${isVideoMedia(item) ? "video" : "screenshot"}`,
+            caption: [
+              title,
+              item.uploaded_by?.name || item.uploaded_by?.email,
+              fmtDate(item.created_at),
+            ]
+              .filter(Boolean)
+              .join(" · "),
+            isVideo: isVideoMedia(item),
+          }))}
+          index={viewing}
+          onIndexChange={setViewing}
+        />
       </CardContent>
     </Card>
   )

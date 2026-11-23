@@ -7,6 +7,7 @@ import { format, parseISO } from "date-fns"
 import { CheckCircle2, Loader2, Rss } from "lucide-react"
 import toast from "react-hot-toast"
 
+import { ZoomableImage } from "@/components/common/media-lightbox"
 import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -466,9 +467,9 @@ function DeliverableRow({
       </div>
 
       {d.thumbnail_url && (role !== UserRole.BRAND || isDelivered) ? (
-        <img
+        <ZoomableImage
           src={d.thumbnail_url}
-          alt=""
+          title={d.article_title ?? "Article image"}
           className="h-20 w-32 rounded-md object-cover"
         />
       ) : null}

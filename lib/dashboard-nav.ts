@@ -80,7 +80,7 @@ export const dashboardNavItems: DashboardNavItem[] = [
     label: "Reports",
     href: "/reports",
     icon: FileChartColumn,
-    allowed_roles: [UserRole.ADMIN],
+    allowed_roles: [UserRole.ADMIN, UserRole.BRAND],
   },
   {
     label: "Agoda",
