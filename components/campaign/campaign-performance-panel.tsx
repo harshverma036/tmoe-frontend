@@ -65,6 +65,8 @@ import type { ReportDateRange } from "@/lib/report-date-range"
 type Props = {
   campaign: Campaign
   role: UserRole | string | null
+  /** Leave out the Agoda bookings tab (the brand Reports page shows it as its own report). */
+  hideAgoda?: boolean
 }
 
 type Section = "content" | "agoda" | "impact"
@@ -75,18 +77,26 @@ const ALL_SITES = "all"
  * A campaign's live results. Admins and the campaign's brand see every report its brand has
  * (content traffic from its sheets, Agoda bookings, Impact.com); publishers see the notice.
  */
-export function CampaignPerformancePanel({ campaign, role }: Props) {
+export function CampaignPerformancePanel({ campaign, role, hideAgoda = false }: Props) {
   const canSeeReports = role === UserRole.ADMIN || role === UserRole.BRAND
   if (!canSeeReports) return <PendingPerformance campaign={campaign} />
-  return <LivePerformance campaign={campaign} isAdmin={role === UserRole.ADMIN} />
+  return (
+    <LivePerformance
+      campaign={campaign}
+      isAdmin={role === UserRole.ADMIN}
+      hideAgoda={hideAgoda}
+    />
+  )
 }
 
 function LivePerformance({
   campaign,
   isAdmin,
+  hideAgoda,
 }: {
   campaign: Campaign
   isAdmin: boolean
+  hideAgoda: boolean
 }) {
   const overviewQuery = useQuery({
     queryKey: campaignPerformanceQueryKey(campaign.id),
@@ -107,7 +117,7 @@ function LivePerformance({
   }
   if (!overview) return <LoadingSkeleton className="h-64 w-full" />
 
-  const sections = availableSections(overview)
+  const sections = availableSections(overview, hideAgoda)
   if (sections.length === 0) {
     return (
       <PendingPerformance
@@ -139,11 +149,11 @@ function LivePerformance({
   )
 }
 
-function availableSections(overview: CampaignPerformance) {
+function availableSections(overview: CampaignPerformance, hideAgoda: boolean) {
   const sections: { value: Section; label: string }[] = []
   if (overview.sheet_reports > 0)
     sections.push({ value: "content", label: "Content performance" })
-  if (overview.agoda) sections.push({ value: "agoda", label: "Agoda bookings" })
+  if (overview.agoda && !hideAgoda) sections.push({ value: "agoda", label: "Agoda bookings" })
   if (overview.impact) sections.push({ value: "impact", label: "Impact.com" })
   return sections
 }

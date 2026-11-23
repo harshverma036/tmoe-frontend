@@ -3,7 +3,9 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 
+import { AgodaBookingsReport } from "@/components/agoda/agoda-bookings-report"
 import { CampaignPerformancePanel } from "@/components/campaign/campaign-performance-panel"
+import { FilterTabs } from "@/components/common/FilterTabs"
 import { PageHeader } from "@/components/layout/page-header"
 import { ErrorCard } from "@/components/reports/sheet-report"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,18 +18,60 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { apiMessage, formatRange } from "@/lib/agoda-format"
+import { apiMessage, formatDate, formatInt, formatRange } from "@/lib/agoda-format"
+import type { AgodaBookingsParams, AgodaReportParams } from "@/lib/api/agoda"
 import {
   brandReportScopeQueryKey,
   fetchBrandReportScope,
 } from "@/lib/api/brand-report-scope"
 import { campaignQueryKey, fetchCampaignById } from "@/lib/api/campaign"
+import {
+  campaignPerformanceQueryKey,
+  fetchCampaignAgodaBookings,
+  fetchCampaignAgodaReport,
+  fetchCampaignPerformance,
+} from "@/lib/api/campaign-performance"
 import { UserRole } from "@/lib/dashboard-nav"
+
+type BrandReport = "content" | "agoda"
+
+const REPORT_TABS: { value: BrandReport; label: string }[] = [
+  { value: "content", label: "Content performance" },
+  { value: "agoda", label: "Agoda bookings" },
+]
+
+/**
+ * Agoda's bookings dashboard, the same one admins see, read through the brand's campaign (the
+ * campaign endpoints check the campaign is this brand's).
+ */
+function BrandAgodaReport({ campaignId }: { campaignId: string }) {
+  const overviewQuery = useQuery({
+    queryKey: campaignPerformanceQueryKey(campaignId),
+    queryFn: () => fetchCampaignPerformance(campaignId),
+    staleTime: 0,
+  })
+  return (
+    <AgodaBookingsReport
+      meta={overviewQuery.data ? overviewQuery.data.agoda : undefined}
+      metaError={overviewQuery.isError ? overviewQuery.error : null}
+      onRefetchMeta={() => overviewQuery.refetch()}
+      fetchReport={(params: AgodaReportParams) =>
+        fetchCampaignAgodaReport(campaignId, params)
+      }
+      fetchBookings={(params: AgodaBookingsParams) =>
+        fetchCampaignAgodaBookings(campaignId, params)
+      }
+      queryKey={[...campaignPerformanceQueryKey(campaignId), "agoda-dashboard"]}
+      scopeKey={`campaign:${campaignId}`}
+      canImport={false}
+    />
+  )
+}
 
 /**
  * A brand's Reports page: the Performance report of one of its campaigns (content pageviews and
- * uniques from its sheets, Agoda bookings for Agoda, Impact.com), opening on the newest campaign
- * and its own dates.
+ * uniques from its sheets, Impact.com), opening on the newest campaign and its own dates. Agoda
+ * also gets its bookings dashboard as a second report.
  */
 export function BrandReports() {
   const scopeQuery = useQuery({
@@ -37,6 +81,9 @@ export function BrandReports() {
   })
   const scope = scopeQuery.data
   const campaigns = scope?.campaigns ?? []
+
+  const [pickedReport, setPickedReport] = useState<BrandReport>("content")
+  const report: BrandReport = scope?.is_agoda ? pickedReport : "content"
 
   const [pickedId, setPickedId] = useState<string | null>(null)
   const campaignId =
@@ -81,6 +128,8 @@ export function BrandReports() {
         onRetry={() => campaignQuery.refetch()}
       />
     )
+  } else if (report === "agoda") {
+    body = <BrandAgodaReport campaignId={campaignId} />
   } else if (!campaignQuery.data) {
     body = <LoadingSkeleton className="h-64 w-full" />
   } else {
@@ -90,26 +139,40 @@ export function BrandReports() {
         key={campaignQuery.data.id}
         campaign={campaignQuery.data}
         role={UserRole.BRAND}
+        hideAgoda={scope?.is_agoda}
       />
     )
   }
+
+  // Shares its cache with the Agoda report's own lookup.
+  const overviewQuery = useQuery({
+    queryKey: campaignPerformanceQueryKey(campaignId ?? ""),
+    queryFn: () => fetchCampaignPerformance(campaignId as string),
+    enabled: report === "agoda" && campaignId !== null,
+    staleTime: 0,
+  })
+  const agodaMeta = overviewQuery.data?.agoda
 
   const dates =
     picked?.start_date && picked.end_date
       ? ` · ${formatRange(picked.start_date, picked.end_date)}`
       : ""
+  const description =
+    report === "agoda"
+      ? agodaMeta && agodaMeta.total_bookings > 0
+        ? `${formatInt(agodaMeta.total_bookings)} bookings, booked ${formatDate(agodaMeta.first_booking_date)} – ${formatDate(agodaMeta.last_booking_date)}. Bookings, value, commission and where guests stay. All amounts in USD.`
+        : "Hotel bookings and commission from Agoda Partners. All amounts in USD."
+      : picked
+        ? `${picked.name}${dates}. Pageviews, uniques, clicks and CTR for your campaign's articles.`
+        : "Your campaigns' performance."
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Reports"
-        description={
-          picked
-            ? `${picked.name}${dates}. Pageviews, uniques, clicks and CTR for your campaign's articles${scope?.is_agoda ? ", plus Agoda bookings" : ""}.`
-            : "Your campaigns' performance."
-        }
+        description={description}
         actions={
-          campaigns.length > 1 ? (
+          report === "content" && campaigns.length > 1 ? (
             <div className="space-y-1.5">
               <Label htmlFor="brand-report-campaign">Campaign</Label>
               <Select value={campaignId ?? undefined} onValueChange={setPickedId}>
@@ -128,6 +191,15 @@ export function BrandReports() {
           ) : null
         }
       />
+      {scope?.is_agoda && campaignId !== null ? (
+        <FilterTabs
+          tabs={REPORT_TABS}
+          value={report}
+          onChange={setPickedReport}
+          label="Report"
+          className="-mt-2 border-b border-border pb-3"
+        />
+      ) : null}
       {body}
     </div>
   )
