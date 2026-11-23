@@ -7,11 +7,14 @@ import {
   Check,
   FileText,
   Grid3x3,
+  Link2,
+  Newspaper,
   LayoutTemplate,
   PanelBottom,
   PanelLeft,
   PanelRight,
   Search,
+  PanelRightDashed,
   Sidebar,
   Smartphone,
   Sparkles,
@@ -48,6 +51,9 @@ const POSITION_ICONS: Record<ContentPlacementPosition, LucideIcon> = {
   AEO: Sparkles,
   PUSH_NOTIFICATION: BellRing,
   IN_APP: Smartphone,
+  RIGHT_SIDE_WIDGET: PanelRightDashed,
+  ARTICLE_HYPERLINK: Link2,
+  NEWS_FEED: Newspaper,
 }
 
 export function PlacementPicker({ value, onChange, disabled }: PlacementPickerProps) {

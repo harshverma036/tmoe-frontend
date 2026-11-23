@@ -1,11 +1,14 @@
 "use client"
 
-import { BellRing, Search, Smartphone, Sparkles } from "lucide-react"
+import { BellRing, Newspaper, Play, Search, Smartphone, Sparkles } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import type { ContentPlacementPosition } from "@/lib/content-placement.types"
 
-type Channel = Extract<ContentPlacementPosition, "GOOGLE" | "AEO" | "PUSH_NOTIFICATION" | "IN_APP">
+type Channel = Extract<
+  ContentPlacementPosition,
+  "GOOGLE" | "AEO" | "PUSH_NOTIFICATION" | "IN_APP" | "NEWS_FEED"
+>
 
 type ChannelPreviewProps = {
   channel: ContentPlacementPosition
@@ -179,15 +182,52 @@ function InAppPreview({ emphasized }: { emphasized?: boolean }) {
   )
 }
 
+function NewsFeedPreview({ emphasized }: { emphasized?: boolean }) {
+  return (
+    <div className="flex flex-1 flex-col gap-3 p-4">
+      <div className="flex items-center gap-2">
+        <Newspaper className="text-muted-foreground size-3.5" />
+        <span className="text-xs font-semibold">Latest news</span>
+      </div>
+      <Muted className="flex gap-3 p-2.5">
+        <div className="bg-muted size-12 shrink-0 rounded-md" />
+        <div className="flex-1 space-y-1.5 pt-1">
+          <Line className="w-2/3" />
+          <Line className="w-full" />
+        </div>
+      </Muted>
+      <Highlight emphasized={emphasized} className="p-2.5">
+        <div className="bg-primary/25 relative mb-2 flex h-24 items-center justify-center rounded-md">
+          <span className="flex size-9 items-center justify-center rounded-full bg-black/55 text-white">
+            <Play className="size-4 translate-x-px fill-current" />
+          </span>
+        </div>
+        <p className="text-muted-foreground text-[10px]">publisher-site.com · Video</p>
+        <p className="mt-0.5 text-xs font-semibold leading-snug">
+          Stunning Goa beaches you must visit
+        </p>
+      </Highlight>
+      <Muted className="flex gap-3 p-2.5">
+        <div className="bg-muted size-12 shrink-0 rounded-md" />
+        <div className="flex-1 space-y-1.5 pt-1">
+          <Line className="w-1/2" />
+          <Line className="w-5/6" />
+        </div>
+      </Muted>
+    </div>
+  )
+}
+
 const TITLE: Record<Channel, string> = {
   GOOGLE: "Search results",
   AEO: "AI answer",
   PUSH_NOTIFICATION: "Lock screen",
   IN_APP: "Publisher app",
+  NEWS_FEED: "News feed",
 }
 
 /**
- * Mock of an off-site channel (Google, AI answers, push, in app), highlighting where the
+ * Mock of an off-site channel (Google, AI answers, push, in app, news feed), highlighting where the
  * branded content shows up. Same footprint as the on-site page mock.
  */
 export function ChannelPreview({
@@ -231,6 +271,7 @@ export function ChannelPreview({
         {c === "AEO" ? <AeoPreview emphasized={emphasized} /> : null}
         {c === "PUSH_NOTIFICATION" ? <PushPreview emphasized={emphasized} /> : null}
         {c === "IN_APP" ? <InAppPreview emphasized={emphasized} /> : null}
+        {c === "NEWS_FEED" ? <NewsFeedPreview emphasized={emphasized} /> : null}
       </div>
     </div>
   )

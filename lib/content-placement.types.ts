@@ -12,6 +12,9 @@ export type ContentPlacementPosition =
   | "AEO"
   | "PUSH_NOTIFICATION"
   | "IN_APP"
+  | "RIGHT_SIDE_WIDGET"
+  | "NEWS_FEED"
+  | "ARTICLE_HYPERLINK"
 
 /** On the publisher's page, or a channel that surfaces the content elsewhere. */
 export type ContentPlacementGroup = "ON_SITE" | "CHANNEL"
@@ -99,6 +102,18 @@ export const CONTENT_PLACEMENT_POSITIONS: {
     group: "ON_SITE",
   },
   {
+    value: "RIGHT_SIDE_WIDGET",
+    label: "Right side widget",
+    description: "Widget in the right-hand sidebar of publisher pages",
+    group: "ON_SITE",
+  },
+  {
+    value: "ARTICLE_HYPERLINK",
+    label: "Article hyperlink",
+    description: "Link to the article placed inside other articles' text",
+    group: "ON_SITE",
+  },
+  {
     value: "CATEGORY_PAGE",
     label: "Category page",
     description: "Listing grid on category or tag pages",
@@ -132,6 +147,12 @@ export const CONTENT_PLACEMENT_POSITIONS: {
     value: "IN_APP",
     label: "In app",
     description: "Featured inside the publisher's mobile app",
+    group: "CHANNEL",
+  },
+  {
+    value: "NEWS_FEED",
+    label: "News feed",
+    description: "In the publisher's news feed, as an article or a video",
     group: "CHANNEL",
   },
 ]

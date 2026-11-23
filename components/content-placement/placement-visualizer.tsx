@@ -115,7 +115,10 @@ export function PlacementVisualizer({
               className={cn(
                 "relative flex flex-1 flex-col justify-center gap-2 p-3",
                 isLg ? "min-h-[140px]" : "",
-                zoneClass(p === "CENTER" || p === "IN_ARTICLE", emphasized),
+                zoneClass(
+                  p === "CENTER" || p === "IN_ARTICLE" || p === "ARTICLE_HYPERLINK",
+                  emphasized,
+                ),
               )}
             >
               <ActiveBadge show={(p === "CENTER" || p === "IN_ARTICLE") && emphasized} />
@@ -129,6 +132,20 @@ export function PlacementVisualizer({
                 <div className={cn("bg-muted rounded-full", isLg ? "h-1.5 w-full" : "h-1 w-full")} />
                 <div className={cn("bg-muted rounded-full", isLg ? "h-1.5 w-11/12" : "h-1 w-5/6")} />
               </div>
+              {p === "ARTICLE_HYPERLINK" && (
+                <div
+                  className={cn(
+                    "flex items-center gap-1",
+                    isLg ? "text-xs" : "text-[8px]",
+                  )}
+                >
+                  <div className={cn("bg-muted shrink-0 rounded-full", isLg ? "h-1.5 w-10" : "h-1 w-5")} />
+                  <span className="border-primary bg-primary/25 text-primary rounded-sm border px-1 font-semibold whitespace-nowrap underline underline-offset-2">
+                    Your article link
+                  </span>
+                  <div className={cn("bg-muted min-w-0 flex-1 rounded-full", isLg ? "h-1.5" : "h-1")} />
+                </div>
+              )}
               {p === "IN_ARTICLE" && (
                 <div
                   className={cn(
@@ -187,11 +204,28 @@ export function PlacementVisualizer({
             className={cn(
               "flex w-[24%] shrink-0 items-center justify-center text-center font-medium",
               isLg ? "text-xs" : "text-[9px]",
+              p === "RIGHT_SIDE_WIDGET" ? "flex-col gap-1.5 p-1.5" : "",
               zoneClass(p === "RIGHT", emphasized),
             )}
           >
             <ActiveBadge show={p === "RIGHT" && emphasized} />
-            <span className={cn(p === "RIGHT" && emphasized && "opacity-40")}>Right rail</span>
+            {p === "RIGHT_SIDE_WIDGET" ? (
+              <>
+                <div className="bg-muted/80 w-full flex-1 rounded" />
+                <div
+                  className={cn(
+                    "border-primary bg-primary/25 relative flex w-full flex-[1.4] items-center justify-center rounded-md border font-semibold",
+                    emphasized && "ring-2 ring-primary/35",
+                  )}
+                >
+                  <ActiveBadge show={emphasized} />
+                  <span className={cn(emphasized && "opacity-40")}>Widget</span>
+                </div>
+                <div className="bg-muted/80 w-full flex-1 rounded" />
+              </>
+            ) : (
+              <span className={cn(p === "RIGHT" && emphasized && "opacity-40")}>Right rail</span>
+            )}
           </div>
         </div>
 
