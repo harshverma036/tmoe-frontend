@@ -7,6 +7,12 @@ import { format, parseISO } from "date-fns"
 import { CheckCircle2, Loader2, Rss } from "lucide-react"
 import toast from "react-hot-toast"
 
+import {
+  DeliverablesFilterBar,
+  EMPTY_DELIVERABLE_FILTERS,
+  filterDeliverables,
+  type DeliverableFilters,
+} from "@/components/campaign/deliverables-filters"
 import { ZoomableImage } from "@/components/common/media-lightbox"
 import { ConfirmDialog } from "@/components/common/ConfirmDialog"
 import { Badge } from "@/components/ui/badge"
@@ -107,6 +113,7 @@ export function CampaignDeliverablesSection({
     action: "reject" | "needs-revision"
   } | null>(null)
   const [reviewNote, setReviewNote] = useState("")
+  const [filters, setFilters] = useState<DeliverableFilters>(EMPTY_DELIVERABLE_FILTERS)
 
   const { data, isLoading } = useQuery({
     queryKey: deliverablesQueryKey(campaignId),
@@ -231,6 +238,7 @@ export function CampaignDeliverablesSection({
 
   const items = data?.items ?? []
   const summary = data?.summary
+  const shownItems = filterDeliverables(items, filters)
 
   return (
     <div className="space-y-4">
@@ -319,34 +327,47 @@ export function CampaignDeliverablesSection({
                 : "No deliverables defined for this campaign yet."}
             </p>
           ) : (
-            <ul className="space-y-3">
-              {items.map((d) => (
-                <DeliverableRow
-                  key={d.id}
-                  deliverable={d}
-                  role={role}
-                  url={urlById[d.id] ?? ""}
-                  onUrlChange={(v) =>
-                    setUrlById((prev) => ({ ...prev, [d.id]: v }))
-                  }
-                  onSubmit={() => {
-                    const url = urlById[d.id]?.trim()
-                    if (!url) {
-                      toast.error("Enter a valid URL")
-                      return
+            <>
+              <DeliverablesFilterBar
+                items={items}
+                filters={filters}
+                onChange={setFilters}
+                shown={shownItems.length}
+              />
+              {shownItems.length === 0 ? (
+                <p className="text-muted-foreground text-sm">
+                  No articles match these filters.
+                </p>
+              ) : null}
+              <ul className="space-y-3">
+                {shownItems.map((d) => (
+                  <DeliverableRow
+                    key={d.id}
+                    deliverable={d}
+                    role={role}
+                    url={urlById[d.id] ?? ""}
+                    onUrlChange={(v) =>
+                      setUrlById((prev) => ({ ...prev, [d.id]: v }))
                     }
-                    submitMutation.mutate({ id: d.id, url })
-                  }}
-                  submitPending={submitMutation.isPending}
-                  onApprove={() => approveMutation.mutate(d.id)}
-                  approvePending={approveMutation.isPending}
-                  onReject={() => setReviewAction({ id: d.id, action: "reject" })}
-                  onNeedsRevision={() =>
-                    setReviewAction({ id: d.id, action: "needs-revision" })
-                  }
-                />
-              ))}
-            </ul>
+                    onSubmit={() => {
+                      const url = urlById[d.id]?.trim()
+                      if (!url) {
+                        toast.error("Enter a valid URL")
+                        return
+                      }
+                      submitMutation.mutate({ id: d.id, url })
+                    }}
+                    submitPending={submitMutation.isPending}
+                    onApprove={() => approveMutation.mutate(d.id)}
+                    approvePending={approveMutation.isPending}
+                    onReject={() => setReviewAction({ id: d.id, action: "reject" })}
+                    onNeedsRevision={() =>
+                      setReviewAction({ id: d.id, action: "needs-revision" })
+                    }
+                  />
+                ))}
+              </ul>
+            </>
           )}
 
           {role === UserRole.BRAND ? (
@@ -509,9 +530,13 @@ function DeliverableRow({
         </a>
       ) : null}
 
-      {d.submitted_at && role !== UserRole.BRAND ? (
+      {d.published_at || (d.submitted_at && role !== UserRole.BRAND) ? (
         <p className="text-muted-foreground text-xs">
-          Submitted {fmtDate(d.submitted_at)}
+          {d.published_at ? `Published ${fmtDate(d.published_at)}` : null}
+          {d.published_at && d.submitted_at && role !== UserRole.BRAND ? " · " : null}
+          {d.submitted_at && role !== UserRole.BRAND
+            ? `Submitted ${fmtDate(d.submitted_at)}`
+            : null}
         </p>
       ) : null}
 
